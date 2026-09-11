@@ -7,6 +7,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.enableShutdownHooks();
   const configService = app.get(ConfigService);
 
   app.use(helmet());
