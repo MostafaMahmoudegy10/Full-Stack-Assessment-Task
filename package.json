@@ -8,6 +8,8 @@
   },
   "scripts": {
     "start": "node scripts/start-heroku.cjs",
+    "test:deployment": "node scripts/test-deployment.cjs",
+    "heroku-prebuild": "corepack enable pnpm",
     "heroku-postbuild": "node scripts/build-heroku.cjs",
     "dev": "turbo run dev",
     "build": "turbo run build",

@@ -62,6 +62,7 @@ for (const [name, entry, cwd] of entries) {
     },
   });
   children.add(child);
+  if (child.pid) console.log(`${name} process started (pid ${child.pid}).`);
   child.on('error', () => {
     console.error(`${name} failed to start.`);
     shutdown(1);
