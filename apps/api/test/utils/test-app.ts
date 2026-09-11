@@ -17,6 +17,8 @@ export async function createTestApp(): Promise<TestContext> {
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
   await app.init();
+  const connection = app.get<Connection>(getConnectionToken());
+  await Promise.all(Object.values(connection.models).map((model) => model.init()));
 
   return { app, connection: app.get<Connection>(getConnectionToken()) };
 }

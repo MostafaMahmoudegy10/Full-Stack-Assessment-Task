@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { Connection } from 'mongoose';
 import request from 'supertest';
 import { OrganizationRole, ProjectRole, TaskPriority, TaskStatus } from '@projectflow/shared';
+import { migrateTaskNumbering } from '../src/database/migrate-task-numbering';
 import { createTestApp, resetDatabase } from './utils/test-app';
 import {
   addOrganizationMember,
@@ -54,6 +55,22 @@ describe('Tasks', () => {
       owner.id,
     );
     await addProjectMember(connection, projectId, member.id, ProjectRole.MEMBER);
+    // Elevated rights in another organization must never grant access here.
+    const outsideOrg = await createOrganization(
+      connection,
+      'Outside org',
+      'outside-org',
+      outsider.id,
+    );
+    await addOrganizationMember(connection, outsideOrg, outsider.id, OrganizationRole.OWNER);
+    const outsideProject = await createProject(
+      connection,
+      outsideOrg,
+      'Outside project',
+      'OUT',
+      outsider.id,
+    );
+    await addProjectMember(connection, outsideProject, outsider.id, ProjectRole.PROJECT_MANAGER);
   });
 
   it('lets a project member create a task', async () => {
@@ -187,6 +204,123 @@ describe('Tasks', () => {
         .set('Authorization', authHeader(user))
         .send({ status: TaskStatus.IN_PROGRESS })
         .expect(200);
+    }
+  });
+
+  it('allocates unique numbers for parallel requests and never reuses deleted numbers', async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        request(app.getHttpServer())
+          .post(`/projects/${projectId}/tasks`)
+          .set('Authorization', authHeader(member))
+          .send({ title: `Parallel task ${index}` })
+          .expect(201),
+      ),
+    );
+    const numbers = responses.map((response) => response.body.number as number);
+    expect(new Set(numbers).size).toBe(20);
+    expect([...numbers].sort((a, b) => a - b)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+    const highest = responses.find((response) => response.body.number === 20)!;
+    await request(app.getHttpServer())
+      .delete(`/tasks/${highest.body.id}`)
+      .set('Authorization', authHeader(owner))
+      .expect(204);
+    const next = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/tasks`)
+      .set('Authorization', authHeader(member))
+      .send({ title: 'After deleting highest' })
+      .expect(201);
+    expect(next.body.number).toBe(21);
+  });
+
+  it('keeps counters independent between projects', async () => {
+    const project = await connection
+      .collection('projects')
+      .findOne({ _id: new connection.base.Types.ObjectId(projectId) });
+    const otherId = await createProject(
+      connection,
+      project!.organizationId.toString(),
+      'Other',
+      'WEB',
+      owner.id,
+    );
+    for (const id of [projectId, otherId]) {
+      const result = await request(app.getHttpServer())
+        .post(`/projects/${id}/tasks`)
+        .set('Authorization', authHeader(owner))
+        .send({ title: 'Independent counter' })
+        .expect(201);
+      expect(result.body.number).toBe(1);
+    }
+  });
+
+  it('migrates existing counters from the maximum and preserves larger counters on rerun', async () => {
+    const created = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/tasks`)
+      .set('Authorization', authHeader(member))
+      .send({ title: 'Existing task' })
+      .expect(201);
+    await connection
+      .collection('tasks')
+      .updateOne(
+        { _id: new connection.base.Types.ObjectId(created.body.id) },
+        { $set: { number: 9, key: 'ENG-9' } },
+      );
+    const filter = { _id: new connection.base.Types.ObjectId(projectId) };
+    await connection.collection('projects').updateOne(filter, { $unset: { taskCounter: '' } });
+    await migrateTaskNumbering(connection);
+    expect((await connection.collection('projects').findOne(filter))!.taskCounter).toBeUndefined();
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/tasks`)
+      .set('Authorization', authHeader(member))
+      .send({ title: 'Before migration' })
+      .expect(400);
+    await migrateTaskNumbering(connection, true);
+    const next = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/tasks`)
+      .set('Authorization', authHeader(member))
+      .send({ title: 'After migration' })
+      .expect(201);
+    expect(next.body.number).toBe(10);
+    await connection.collection('projects').updateOne(filter, { $set: { taskCounter: 50 } });
+    await migrateTaskNumbering(connection, true);
+    expect((await connection.collection('projects').findOne(filter))!.taskCounter).toBe(50);
+    await expect(
+      connection.collection('tasks').insertOne({
+        projectId: new connection.base.Types.ObjectId(projectId),
+        number: 10,
+        key: 'ENG-10',
+      }),
+    ).rejects.toMatchObject({ code: 11000 });
+  });
+
+  it('refuses duplicate legacy data before changing counters or indexes', async () => {
+    const tasks = connection.collection('tasks');
+    await tasks.dropIndex('projectId_1_number_1');
+    await tasks.createIndex({ projectId: 1, number: 1 });
+    try {
+      await tasks.insertMany(
+        [1, 2].map(() => ({
+          projectId: new connection.base.Types.ObjectId(projectId),
+          number: 7,
+          key: 'ENG-7',
+        })),
+      );
+      await expect(migrateTaskNumbering(connection, true)).rejects.toThrow(
+        'Duplicate task numbers',
+      );
+      const project = await connection
+        .collection('projects')
+        .findOne({ _id: new connection.base.Types.ObjectId(projectId) });
+      expect(project!.taskCounter).toBe(0);
+      await tasks.deleteMany({});
+      await migrateTaskNumbering(connection, true);
+      expect(
+        (await tasks.indexes()).find((index) => index.name === 'projectId_1_number_1')!.unique,
+      ).toBe(true);
+    } finally {
+      await tasks.deleteMany({});
+      await migrateTaskNumbering(connection, true);
     }
   });
 });

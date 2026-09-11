@@ -13,6 +13,7 @@ import { ProjectMemberSchema } from '../project-members/schemas/project-member.s
 import { ProjectSchema } from '../projects/schemas/project.schema';
 import { TaskSchema } from '../tasks/schemas/task.schema';
 import { CommentSchema } from '../comments/schemas/comment.schema';
+import { ActivitySchema } from '../tasks/schemas/activity.schema';
 import { UserSchema } from '../users/schemas/user.schema';
 
 loadEnv({ path: resolve(__dirname, '../../../../.env'), quiet: true });
@@ -28,6 +29,7 @@ const Project = mongoose.model('Project', ProjectSchema);
 const ProjectMember = mongoose.model('ProjectMember', ProjectMemberSchema);
 const Task = mongoose.model('Task', TaskSchema);
 const Comment = mongoose.model('Comment', CommentSchema);
+const Activity = mongoose.model('Activity', ActivitySchema);
 
 interface SeedUser {
   name: string;
@@ -45,9 +47,10 @@ const SEED_USERS: SeedUser[] = [
 
 async function seed(): Promise<void> {
   await mongoose.connect(MONGODB_URI);
-  console.warn(`Connected to ${MONGODB_URI}`);
+  console.warn('Connected to the development database');
 
   await Promise.all([
+    Activity.deleteMany({}),
     Comment.deleteMany({}),
     Task.deleteMany({}),
     ProjectMember.deleteMany({}),
@@ -215,6 +218,14 @@ async function seed(): Promise<void> {
     key: `WEB-${task.number}`,
   }));
 
+  await Project.updateOne(
+    { _id: internalPlatform._id },
+    { $set: { taskCounter: engineeringTasks.length } },
+  );
+  await Project.updateOne(
+    { _id: customerPortal._id },
+    { $set: { taskCounter: portalTasks.length } },
+  );
   const tasks = await Task.insertMany([...engineeringTasks, ...portalTasks]);
   const taskIdByKey = new Map(tasks.map((task) => [task.key, task._id as Types.ObjectId]));
   const taskId = (key: string): Types.ObjectId => {

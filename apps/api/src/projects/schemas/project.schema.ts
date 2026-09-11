@@ -21,6 +21,9 @@ export class Project {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   createdBy: Types.ObjectId;
 
+  @Prop({ type: Number, required: true, default: 0, min: 0 })
+  taskCounter: number;
+
   createdAt: Date;
   updatedAt: Date;
 }

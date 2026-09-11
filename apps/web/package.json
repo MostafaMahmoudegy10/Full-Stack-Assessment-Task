@@ -6,8 +6,9 @@
     "build": "next build",
     "dev": "node scripts/with-env.js dev",
     "start": "node scripts/with-env.js start",
-    "lint": "eslint src",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "lint": "eslint src test playwright.config.ts",
+    "test:browser": "playwright test",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.browser.json --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.1",
@@ -32,6 +33,7 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@projectflow/eslint-config": "workspace:*",
     "@projectflow/tsconfig": "workspace:*",
     "@tailwindcss/postcss": "4.3.3",
