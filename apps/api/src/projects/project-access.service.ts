@@ -41,7 +41,6 @@ export class ProjectAccessService {
       this.organizationMembersService.findRole(project.organizationId, userId),
       this.projectMembersService.findRole(project._id, userId),
     ]);
-
     return { project, organizationRole, projectRole };
   }
 
