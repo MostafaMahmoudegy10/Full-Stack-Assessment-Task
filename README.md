@@ -285,21 +285,20 @@ The real application smoke check used a temporary harness; the committed repeata
 
 Before submission, perform a fresh-clone walkthrough, review and be ready to explain the implementation, and record approximate time spent in the careers form. The PDF supplies no numeric scoring weights; feature completion is not a guaranteed assessment score. Hosting is optional and carries no penalty if omitted (brief, page 31).
 
-## Deployment recommendation (not yet performed)
+## Deployment: one Heroku app
 
-For this assessment demo, the suggested first option is **Vercel for the Next.js frontend and NestJS API as two separate projects, plus MongoDB Atlas**. This is a recommendation, not a verified deployment recipe. Vercel officially supports both [Next.js](https://vercel.com/docs/frameworks/full-stack/nextjs) and [NestJS](https://vercel.com/docs/frameworks/backend/nestjs); the NestJS app runs as a Vercel Function, subject to function limits.
+The selected deployment runs Next.js and NestJS in one Heroku web dyno, with one
+public domain. Next.js serves the frontend and forwards `/api/*` to the internal
+API. The deployment changes preserve the user's original assignment/activity work
+and the existing application behavior.
 
-Use project roots `apps/web` and `apps/api`, with access to workspace dependencies and a build that includes `packages/shared`. Vercel documents [separate projects for monorepo directories](https://vercel.com/docs/monorepos). Its [Hobby plan](https://vercel.com/docs/plans/hobby) is free for personal, non-commercial use within its limits; confirm eligibility before selecting it.
+See [HEROKU.md](HEROKU.md) for Config Vars, MongoDB requirements, build/start
+commands, database setup, and verification. Heroku runs `pnpm heroku-postbuild`
+and starts the root `Procfile`. No credentials, automatic seeds, or automatic
+migrations are included. Local `pnpm dev` still runs the apps separately.
 
-**Heroku is a reasonable alternative for the API** if a continuously running Node process is preferred. Its Cedar Basic dyno is listed at $7/month without sleeping; Eco is $5/month for shared hours and sleeps ([official dyno specifications](https://devcenter.heroku.com/articles/dyno-sizes), checked 11 September 2026). The current API reads `API_PORT`, so a Heroku deployment must map or support Heroku's assigned `PORT` and configure a monorepo build/start process before it is ready. No Procfile or verified Heroku setup is included yet.
-
-Before either deployment:
-
-- Configure Atlas access, a separate demo database, and API-only `MONGODB_URI`/`JWT_SECRET` values in the hosting dashboard.
-- Set `WEB_ORIGIN` to the frontend origin and `NEXT_PUBLIC_API_URL` to the deployed API URL before building the frontend.
-- Validate shared-package builds, database connectivity/transactions, and runtime limits on the actual host. Choose compatible regions for the API and database.
-- Run any existing-data migration with writers stopped. Never run the destructive development seed automatically during deployment.
-- Verify login, role restrictions, assignment/unassignment, and history on the public URLs before adding a live-demo link. Do not expose production credentials or reuse local-only accounts on real data.
+Deployment preparation is implemented; actual Heroku hosting and the provider's
+database connection still require public-host verification.
 
 ## Known limitations and next improvements
 
