@@ -35,4 +35,4 @@ export class Activity {
 
 export const ActivitySchema = SchemaFactory.createForClass(Activity);
 
-ActivitySchema.index({ task: 1, createdAt: -1 });
+ActivitySchema.index({ task: 1, createdAt: -1, _id: -1 });
