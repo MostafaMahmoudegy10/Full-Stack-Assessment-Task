@@ -303,3 +303,16 @@ pnpm --filter @projectflow/api migrate:task-numbering --apply  # apply with writ
 ```
 
 A fresh seed initializes counters automatically. If migration fails, keep writers stopped, resolve the reported problem, and rerun; do not resume the old count-based writer against the new index.
+
+## Frontend assignment and browser tests
+
+The task details page has an assignee selector and paginated activity timeline. Managers can search name/email when a project has more than eight members. Members see the self-assignment/unassignment options allowed by the backend. Saving is server-confirmed: controls are disabled while pending, failures retain the previous value, and success updates task data and invalidates task-list/activity caches. This avoids optimistic rollback complexity for authorization failures and transaction retries.
+
+Browser tests use Playwright against a real Next.js page with deterministic API fixtures, including permission failures and delayed saves. They do not contact your database. Playwright is a development-only dependency added to test keyboard interaction, responsive layout, and server-state updates in a browser.
+
+```bash
+pnpm --filter @projectflow/web exec playwright install chromium
+pnpm --filter @projectflow/web test:browser
+```
+
+An installed Chrome can be used instead: set `PLAYWRIGHT_CHANNEL=chrome` in your shell. Tests start their own Next.js server on port 3743 with a mocked API origin on port 4734; keep port 3743 free. Browser tests use a separate `.next-browser` output directory. Screenshots/traces on failure go under ignored `test-results/`.

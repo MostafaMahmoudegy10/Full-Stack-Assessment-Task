@@ -7,6 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CommentList } from '@/features/comments/components/comment-list';
 import { formatDate } from '@/lib/format';
 import { useTask } from '../hooks';
+import { TaskAssigneeSelect } from './task-assignee-select';
+import { TaskActivity } from './task-activity';
 import { TaskPriorityBadge } from './task-priority-badge';
 import { TaskStatusSelect } from './task-status-select';
 
@@ -46,15 +48,15 @@ export function TaskView({ projectId, taskId }: TaskViewProps) {
         {task.project.name}
       </Link>
 
+      <div className="space-y-2">
+        <p className="font-mono text-[12px] text-muted-foreground">{task.key}</p>
+        <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground">
+          {task.title}
+        </h1>
+      </div>
+
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 space-y-6">
-          <div className="space-y-2">
-            <p className="font-mono text-[12px] text-muted-foreground">{task.key}</p>
-            <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground">
-              {task.title}
-            </h1>
-          </div>
-
           <section aria-label="Description">
             <h2 className="mb-2 text-sm font-semibold text-foreground">Description</h2>
             {task.description ? (
@@ -69,9 +71,11 @@ export function TaskView({ projectId, taskId }: TaskViewProps) {
           </section>
 
           <CommentList taskId={taskId} />
+          <TaskActivity taskId={taskId} />
         </div>
 
-        <aside className="space-y-5 lg:border-l lg:border-border lg:pl-6">
+        <aside className="order-first space-y-5 lg:order-none lg:border-l lg:border-border lg:pl-6">
+          <TaskAssigneeSelect task={task} />
           <div className="space-y-1.5">
             <h2 className="text-[11px] font-medium uppercase tracking-wide text-subtle-foreground">
               Status

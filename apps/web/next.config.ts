@@ -7,6 +7,7 @@ loadEnv({ path: resolve(process.cwd(), '../../.env'), quiet: true });
 
 const nextConfig: NextConfig = {
   agentRules: false,
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   reactStrictMode: true,
   transpilePackages: ['@projectflow/shared'],
   env: {

@@ -24,3 +24,8 @@ pnpm-debug.log*
 .internal/
 
 .local/
+
+**/test-results/
+**/playwright-report/
+
+**/.next-browser/
