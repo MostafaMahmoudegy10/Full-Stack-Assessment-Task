@@ -68,11 +68,39 @@ availability or transaction support. A successful assignment verifies the latter
 
 ## Database setup
 
-Deploy does not seed, migrate, or delete database data. A new database will not
-contain demo accounts/projects automatically. The existing seed command deletes
-and recreates application collections; only run it deliberately on a disposable
-demo database. For an existing database, follow the task-number migration steps
-in [README.md](README.md) with writers stopped before accepting traffic.
+Demo seeding is available in production after deployment. It uses the existing
+seed dataset and the app's `MONGODB_URI` Config Var, without needing build tools.
+It deletes and recreates ProjectFlow collections, including activity history.
+Use it only for your disposable assessment/demo database, with nobody editing data.
+
+From your terminal, run once (replace `YOUR-APP` with the Heroku app name):
+
+```bash
+heroku run --app YOUR-APP --exit-code -- node scripts/seed-demo.cjs --reset-demo-data
+```
+
+Or, where Heroku's **More → Run console** is available, enter:
+
+```bash
+node scripts/seed-demo.cjs --reset-demo-data
+```
+
+The equivalent pnpm command is `pnpm seed:demo --reset-demo-data`. The explicit
+flag acknowledges the database reset. No credentials belong in the command;
+Heroku supplies `MONGODB_URI` from Config Vars. The script refuses to run without
+that variable or the reset flag. For CLI details, see
+[Heroku one-off dynos](https://devcenter.heroku.com/articles/working-with-one-off-dynos).
+
+After success, sign in with `ammar@example.com` / `Password123!` (demo owner).
+Other seeded users are `sarah@example.com`, `ahmed@example.com`, `magd@example.com`,
+and `outside@example.com`, with the same demo password. The seed creates projects,
+tasks, comments, and memberships; new assignment changes populate activity history.
+These public test accounts are for demonstration data only.
+
+Normal deploys and restarts do not rerun the seed, so testing changes survive a
+redeploy. Running the command again resets them. The existing local `pnpm seed`
+command is unchanged. For an existing non-demo database, follow the task-number
+migration steps in [README.md](README.md) with writers stopped before accepting traffic.
 
 ## Local production verification
 
@@ -85,6 +113,8 @@ The deployment smoke test creates and seeds its own disposable MongoDB replica
 set, then uses the real combined launcher. It never uses `MONGODB_URI` from your
 shell or local `.env`. Like API tests, it supports `MONGOMS_SYSTEM_BINARY` and
 `MONGOMS_SYSTEM_BINARY_VERSION_CHECK` for an installed test MongoDB executable.
+Install Playwright Chromium as described in the README, or set
+`PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome browser.
 
 To start manually, export the Config Vars above plus a local `PORT` (e.g. 3742),
 then run `pnpm start`. This production launcher requires environment variables;
@@ -95,6 +125,13 @@ it does not load a root `.env` on your behalf. `pnpm dev` remains unchanged.
 The repository includes deployment preparation. Public Heroku startup, provider
 database connectivity/transactions, memory use, and public URL checks must still
 be verified on the actual app. No database credentials are included here.
+
+Local verification on 12 September 2026 passed the production build, TypeScript,
+ESLint, and deployment smoke test using Chrome and a disposable MongoDB replica
+set. The smoke test covers demo-seed guards and successful seeding, browser login,
+static assets, same-origin assignment/unassignment and persisted history, and
+cleanup after either server exits. POSIX signal forwarding is skipped on Windows
+and still requires Linux/Heroku verification.
 
 References: [Heroku Node support](https://devcenter.heroku.com/articles/nodejs-support),
 [Heroku Node deployment](https://devcenter.heroku.com/articles/deploying-nodejs),

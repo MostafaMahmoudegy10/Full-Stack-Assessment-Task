@@ -23,8 +23,8 @@ async function freePort(port = 0) {
   return assigned;
 }
 
-function run(entry, env) {
-  const child = spawn(process.execPath, [resolve(root, entry)], {
+function run(entry, env, args = []) {
+  const child = spawn(process.execPath, [resolve(root, entry), ...args], {
     cwd: root,
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -49,6 +49,15 @@ async function until(check, description, timeout = 60000) {
 }
 
 async function main() {
+  const noFlag = run('scripts/seed-demo.cjs', { ...process.env, MONGODB_URI: '' });
+  assert.equal(await noFlag.done, 1);
+  assert.match(noFlag.output(), /--reset-demo-data/);
+  const noUri = run('scripts/seed-demo.cjs', { ...process.env, MONGODB_URI: '' }, [
+    '--reset-demo-data',
+  ]);
+  assert.equal(await noUri.done, 1);
+  assert.match(noUri.output(), /MONGODB_URI must be set explicitly/);
+  console.log('PASS: demo seed refuses missing reset flag or explicit database URI.');
   await freePort(4732); // Refuse to interfere with an existing local API.
   const port = await freePort();
   const origin = `http://127.0.0.1:${port}`;
@@ -78,8 +87,9 @@ async function main() {
       NODE_ENV: 'production',
     };
     // Always overwrite inherited credentials BEFORE invoking the destructive demo seed.
-    const seed = run('apps/api/dist/database/seed.js', env);
+    const seed = run('scripts/seed-demo.cjs', env, ['--reset-demo-data']);
     assert.equal(await seed.done, 0, 'Disposable database seed failed');
+    console.log('PASS: production demo-seed command populates an isolated database.');
     const start = async () => {
       app = run('scripts/start-heroku.cjs', env);
       await until(async () => {
