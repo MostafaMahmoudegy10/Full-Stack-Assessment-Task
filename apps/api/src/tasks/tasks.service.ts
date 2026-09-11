@@ -8,7 +8,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { type FilterQuery, Model, Types } from 'mongoose';
 import {
   ProjectRole,
-  TaskStatus,
   type Paginated,
   type TaskActivityEntry,
   type TaskDetail,
@@ -149,7 +148,11 @@ export class TasksService {
     const task = await this.findTaskOrFail(taskId);
     await this.projectAccessService.assertCanManage(task.projectId, userId);
 
-    await Promise.all([this.commentModel.deleteMany({ taskId: task._id }), task.deleteOne()]);
+    await this.taskModel.db.transaction(async (session) => {
+      await this.taskModel.deleteOne({ _id: task._id }, { session });
+      await this.commentModel.deleteMany({ taskId: task._id }, { session });
+      await this.activityModel.deleteMany({ task: task._id }, { session });
+    });
   }
 
   async findTaskOrFail(taskId: Types.ObjectId): Promise<TaskDocument> {
@@ -184,7 +187,10 @@ export class TasksService {
 
     const actorIds = [
       ...new Map(
-        activities.map((activity) => [activity.actor.toString(), activity.actor]),
+        activities
+          .flatMap((activity) => [activity.actor, activity.metadata.from, activity.metadata.to])
+          .filter((id): id is Types.ObjectId => id != null)
+          .map((id) => [id.toString(), id]),
       ).values(),
     ];
     const actors = await this.usersService.findManyByIds(actorIds);
@@ -194,7 +200,22 @@ export class TasksService {
       items: activities.map((activity) => ({
         id: activity._id.toString(),
         type: activity.type,
-        actor: toCreatorSummary(actorsById.get(activity.actor.toString())),
+        actor: toCreatorSummary(
+          actorsById.get(activity.actor.toString()),
+          activity.actor.toString(),
+        ),
+        previousAssignee: activity.metadata.from
+          ? toCreatorSummary(
+              actorsById.get(activity.metadata.from.toString()),
+              activity.metadata.from.toString(),
+            )
+          : null,
+        newAssignee: activity.metadata.to
+          ? toCreatorSummary(
+              actorsById.get(activity.metadata.to.toString()),
+              activity.metadata.to.toString(),
+            )
+          : null,
         taskId: task._id.toString(),
         metadata: {
           from: activity.metadata.from?.toString() ?? null,
@@ -214,7 +235,11 @@ export class TasksService {
     }
 
     const [creators, commentRows] = await Promise.all([
-      this.usersService.findManyByIds(tasks.map((task) => task.createdBy)),
+      this.usersService.findManyByIds(
+        tasks.flatMap((task) =>
+          task.assignee ? [task.createdBy, task.assignee] : [task.createdBy],
+        ),
+      ),
       this.commentModel
         .aggregate<{
           _id: Types.ObjectId;
@@ -239,6 +264,9 @@ export class TasksService {
       priority: task.priority,
       commentCount: commentCounts.get(task._id.toString()) ?? 0,
       assignedTo: task.assignee?.toString() ?? null,
+      assignee: task.assignee
+        ? toCreatorSummary(creatorsById.get(task.assignee.toString()), task.assignee.toString())
+        : null,
       createdBy: toCreatorSummary(creatorsById.get(task.createdBy.toString())),
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
@@ -250,54 +278,47 @@ export class TasksService {
     assigneeId: string | null,
     currentUser: AuthenticatedUser,
   ): Promise<TaskDetail> {
-    // Validate the task is peresent
-    const task = await this.findTaskOrFail(toObjectId(taskId, 'task id'));
-
-    //Validate the task is not inactive
-    if (task.status === TaskStatus.DONE) {
-      throw new BadRequestException('Cannot assign an inactive task');
-    }
-
+    const id = toObjectId(taskId, 'task id');
     const currentUserId = toObjectId(currentUser.id, 'user id');
-    const assigneeObjectId = assigneeId ? toObjectId(assigneeId, 'assignee id') : null;
+    const assigneeObjectId = assigneeId === null ? null : toObjectId(assigneeId, 'assignee id');
 
-    const access = await this.projectAccessService.resolve(task.projectId, currentUserId);
-
-    // validate if the assignee is a member of the project
-    if (
-      assigneeObjectId &&
-      !(await this.projectAccessService.isMember(task.projectId, assigneeObjectId))
-    ) {
-      throw new BadRequestException('Assignee must be a member of this project');
-    }
-
-    if (
-      !canManage(access) &&
-      (access.projectRole !== ProjectRole.MEMBER || assigneeId !== currentUser.id)
-    ) {
-      throw new ForbiddenException('You do not have permission to assign this task');
-    }
-
-    const currentAssignee = task.assignee?.toString() ?? null;
-    if (currentAssignee === assigneeId) {
-      return this.toDetail(task, access.project);
-    }
-
-    const previousAssignee = task.assignee ?? null;
-    task.assignee = assigneeObjectId;
-    await task.save();
-
-    await this.activityModel.create({
-      type: ActivityType.TASK_ASSIGNEE_CHANGED,
-      actor: currentUserId,
-      task: task._id,
-      metadata: {
-        from: previousAssignee,
-        to: assigneeObjectId,
-      },
+    await this.taskModel.db.transaction(async (session) => {
+      // Re-read on every transaction retry so history describes the committed predecessor.
+      const task = await this.taskModel.findById(id).session(session).exec();
+      if (!task) throw new NotFoundException('Task not found');
+      const access = await this.projectAccessService.assertCanView(task.projectId, currentUserId);
+      const isSelfAssignment = assigneeObjectId?.equals(currentUserId) ?? false;
+      const isSelfUnassignment =
+        assigneeObjectId === null && (task.assignee?.equals(currentUserId) ?? false);
+      if (
+        !canManage(access) &&
+        (access.projectRole !== ProjectRole.MEMBER || (!isSelfAssignment && !isSelfUnassignment))
+      ) {
+        throw new ForbiddenException('You do not have permission to assign this task');
+      }
+      if (
+        assigneeObjectId &&
+        !(await this.projectAccessService.isMember(task.projectId, assigneeObjectId))
+      ) {
+        throw new BadRequestException('Assignee must be a member of this project');
+      }
+      if ((task.assignee?.toString() ?? null) === (assigneeObjectId?.toString() ?? null)) return;
+      const previousAssignee = task.assignee ?? null;
+      task.assignee = assigneeObjectId;
+      await task.save({ session });
+      await this.activityModel.create(
+        [
+          {
+            type: ActivityType.TASK_ASSIGNEE_CHANGED,
+            actor: currentUserId,
+            task: task._id,
+            metadata: { from: previousAssignee, to: assigneeObjectId },
+          },
+        ],
+        { session },
+      );
     });
-
-    return this.toDetail(task, access.project);
+    return this.findOne(id, currentUserId);
   }
 
   private async toDetail(task: TaskDocument, project?: ProjectDocument): Promise<TaskDetail> {
@@ -327,6 +348,6 @@ const DELETED_USER = {
   avatarUrl: null,
 };
 
-function toCreatorSummary(user: Parameters<typeof toUserSummary>[0] | undefined) {
-  return user ? toUserSummary(user) : DELETED_USER;
+function toCreatorSummary(user: Parameters<typeof toUserSummary>[0] | undefined, id = '') {
+  return user ? toUserSummary(user) : { ...DELETED_USER, id };
 }
