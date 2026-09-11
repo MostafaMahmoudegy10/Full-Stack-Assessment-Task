@@ -51,6 +51,7 @@ export interface TaskSummary {
   commentCount: number;
   createdBy: UserSummary;
   assignedTo?: string | null;
+  assignee?: UserSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,6 +64,8 @@ export interface TaskDetail extends TaskSummary {
 export interface TaskActivityEntry {
   id: string;
   type: 'TASK_ASSIGNEE_CHANGED';
+  previousAssignee: UserSummary | null;
+  newAssignee: UserSummary | null;
   actor: UserSummary;
   taskId: string;
   metadata: {

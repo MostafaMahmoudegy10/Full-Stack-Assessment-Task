@@ -265,3 +265,27 @@ parsing.
 
 Components are server components by default; `"use client"` is added only where
 interactivity or hooks require it.
+
+## Assignment and activity (candidate extension)
+
+The candidate implemented task assignment and activity history in `aa5e8d1`, extending upstream starter `27c84d8`. Subsequent work builds on that implementation with self-unassignment, transactional consistency, frontend integration, and regression tests.
+
+- `PATCH /tasks/:taskId/assignee` accepts `{ "assigneeId": "USER_ID" }` or `{ "assigneeId": null }`.
+- `GET /tasks/:taskId/activity?page=1&pageSize=20` returns newest-first history with actors and previous/new assignee summaries.
+- Owners/admins/project managers can assign project members and unassign anyone. Members can assign themselves (including replacing an assignee) and remove their own assignment. Completed tasks follow the same rules.
+- Task assignment and activity insertion commit in one transaction. Task deletion also removes comments/history transactionally. Repeated assignment to the same user creates no activity.
+
+### MongoDB replica set required
+
+Transactions require a replica set (MongoDB Atlas is also suitable). For local development, use a dedicated data directory and port to avoid changing another MongoDB instance:
+
+```bash
+mkdir -p .local/mongo
+mongod --replSet rs0 --bind_ip 127.0.0.1 --port 27018 --dbpath .local/mongo
+# In another terminal, initialize once:
+mongosh --port 27018 --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27018"}]})'
+```
+
+On Windows create `.local/mongo` with `New-Item -ItemType Directory -Force .local/mongo`, then run the same `mongod`/`mongosh` commands. Set `MONGODB_URI=mongodb://localhost:27018/projectflow?replicaSet=rs0` in your root `.env`. Keep MongoDB bound to localhost.
+
+Tests create a disposable one-node replica set and never use the development database. If MongoDB is installed already, set `MONGOMS_SYSTEM_BINARY` to the absolute `mongod` executable path to avoid a download. Set `MONGOMS_SYSTEM_BINARY_VERSION_CHECK=false` if intentionally using a different locally installed version. Run the API test command directly when using these environment overrides: `pnpm --filter @projectflow/api test`.

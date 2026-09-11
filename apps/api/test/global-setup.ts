@@ -1,10 +1,10 @@
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 
 /** Boots an in-memory MongoDB so the suite never touches a developer's database. */
 export default async function globalSetup(): Promise<void> {
-  const mongo = await MongoMemoryServer.create();
+  const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
 
-  (globalThis as typeof globalThis & { __MONGO_SERVER__?: MongoMemoryServer }).__MONGO_SERVER__ =
+  (globalThis as typeof globalThis & { __MONGO_SERVER__?: MongoMemoryReplSet }).__MONGO_SERVER__ =
     mongo;
 
   process.env.MONGODB_URI = mongo.getUri('projectflow_test');
