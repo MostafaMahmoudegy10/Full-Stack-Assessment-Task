@@ -86,8 +86,13 @@ export class TasksController {
   updateStatus(
     @Param('taskId') taskId: string,
     @Body() dto: UpdateTaskStatusDto,
+    @CurrentUser('id') userId: string,
   ): Promise<TaskDetail> {
-    return this.tasksService.updateStatus(toObjectId(taskId, 'task id'), dto);
+    return this.tasksService.updateStatus(
+      toObjectId(taskId, 'task id'),
+      toObjectId(userId, 'user id'),
+      dto,
+    );
   }
 
   @Patch('tasks/:taskId/assignee')

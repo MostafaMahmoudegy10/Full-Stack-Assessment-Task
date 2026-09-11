@@ -83,6 +83,3 @@ export function canManage(context: ProjectAccessContext): boolean {
     context.projectRole === ProjectRole.PROJECT_MANAGER
   );
 }
-
-  
-

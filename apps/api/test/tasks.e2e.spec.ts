@@ -146,4 +146,47 @@ describe('Tasks', () => {
     expect(response.body.total).toBe(1);
     expect(response.body.items[0]).toMatchObject({ title: 'Work in flight' });
   });
+
+  it('blocks outsider mutations without changing the task', async () => {
+    const created = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/tasks`)
+      .set('Authorization', authHeader(member))
+      .send({ title: 'Protected task' })
+      .expect(201);
+    const taskId = created.body.id as string;
+    await request(app.getHttpServer())
+      .patch(`/tasks/${taskId}/status`)
+      .set('Authorization', authHeader(outsider))
+      .send({ status: TaskStatus.DONE })
+      .expect(403);
+    await request(app.getHttpServer())
+      .patch(`/tasks/${taskId}`)
+      .set('Authorization', authHeader(outsider))
+      .send({ title: 'Unauthorized edit' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .delete(`/tasks/${taskId}`)
+      .set('Authorization', authHeader(outsider))
+      .expect(403);
+    const result = await request(app.getHttpServer())
+      .get(`/tasks/${taskId}`)
+      .set('Authorization', authHeader(member))
+      .expect(200);
+    expect(result.body).toMatchObject({ title: 'Protected task', status: TaskStatus.TODO });
+  });
+
+  it('allows member and organization owner status changes', async () => {
+    const created = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/tasks`)
+      .set('Authorization', authHeader(member))
+      .send({ title: 'Allowed status changes' })
+      .expect(201);
+    for (const user of [member, owner]) {
+      await request(app.getHttpServer())
+        .patch(`/tasks/${created.body.id}/status`)
+        .set('Authorization', authHeader(user))
+        .send({ status: TaskStatus.IN_PROGRESS })
+        .expect(200);
+    }
+  });
 });

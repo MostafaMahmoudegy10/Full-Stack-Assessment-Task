@@ -78,7 +78,8 @@ export class TasksService {
     const taskCount = await this.taskModel.countDocuments({ projectId }); // count existing tasks in the project
     const number = taskCount + 1; // assign the next task number
 
-    const task = await this.taskModel.create({ // create the new task
+    const task = await this.taskModel.create({
+      // create the new task
       projectId,
       number,
       key: `${project.key}-${number}`,
@@ -91,7 +92,6 @@ export class TasksService {
 
     return this.toDetail(task, project);
   }
-  
 
   async findOne(taskId: Types.ObjectId, userId: Types.ObjectId): Promise<TaskDetail> {
     const task = await this.findTaskOrFail(taskId);
@@ -131,9 +131,14 @@ export class TasksService {
     return this.toDetail(task, access.project);
   }
 
-  async updateStatus(taskId: Types.ObjectId, dto: UpdateTaskStatusDto): Promise<TaskDetail> {
+  async updateStatus(
+    taskId: Types.ObjectId,
+    userId: Types.ObjectId,
+    dto: UpdateTaskStatusDto,
+  ): Promise<TaskDetail> {
     const task = await this.findTaskOrFail(taskId);
 
+    await this.projectAccessService.assertCanView(task.projectId, userId);
     task.status = dto.status;
     await task.save();
 
@@ -178,7 +183,9 @@ export class TasksService {
     }
 
     const actorIds = [
-      ...new Map(activities.map((activity) => [activity.actor.toString(), activity.actor])).values(),
+      ...new Map(
+        activities.map((activity) => [activity.actor.toString(), activity.actor]),
+      ).values(),
     ];
     const actors = await this.usersService.findManyByIds(actorIds);
     const actorsById = new Map(actors.map((actor) => [actor._id.toString(), actor]));
@@ -243,8 +250,7 @@ export class TasksService {
     assigneeId: string | null,
     currentUser: AuthenticatedUser,
   ): Promise<TaskDetail> {
-   
-    // Validate the task is peresent 
+    // Validate the task is peresent
     const task = await this.findTaskOrFail(toObjectId(taskId, 'task id'));
 
     //Validate the task is not inactive
@@ -258,7 +264,10 @@ export class TasksService {
     const access = await this.projectAccessService.resolve(task.projectId, currentUserId);
 
     // validate if the assignee is a member of the project
-    if (assigneeObjectId && !(await this.projectAccessService.isMember(task.projectId, assigneeObjectId))) {
+    if (
+      assigneeObjectId &&
+      !(await this.projectAccessService.isMember(task.projectId, assigneeObjectId))
+    ) {
       throw new BadRequestException('Assignee must be a member of this project');
     }
 
