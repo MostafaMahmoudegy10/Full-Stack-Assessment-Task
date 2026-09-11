@@ -55,6 +55,22 @@ describe('Tasks', () => {
       owner.id,
     );
     await addProjectMember(connection, projectId, member.id, ProjectRole.MEMBER);
+    // Elevated rights in another organization must never grant access here.
+    const outsideOrg = await createOrganization(
+      connection,
+      'Outside org',
+      'outside-org',
+      outsider.id,
+    );
+    await addOrganizationMember(connection, outsideOrg, outsider.id, OrganizationRole.OWNER);
+    const outsideProject = await createProject(
+      connection,
+      outsideOrg,
+      'Outside project',
+      'OUT',
+      outsider.id,
+    );
+    await addProjectMember(connection, outsideProject, outsider.id, ProjectRole.PROJECT_MANAGER);
   });
 
   it('lets a project member create a task', async () => {

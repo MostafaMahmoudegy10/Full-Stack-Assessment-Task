@@ -29,7 +29,7 @@ frontend, sharing a small package of domain types and enums.
 
 - **Node.js 20.19+** (22 or 24 recommended)
 - **pnpm 10+** — `npm install -g pnpm`
-- **MongoDB 7+** running locally
+- **MongoDB 7+ replica set** running locally (see replica-set setup below)
 
 On macOS:
 
@@ -39,7 +39,7 @@ brew install mongodb-community@7.0
 brew services start mongodb-community@7.0
 ```
 
-Any reachable MongoDB works — point `MONGODB_URI` wherever you like.
+A reachable MongoDB replica set or Atlas deployment works — point `MONGODB_URI` wherever you like.
 
 ---
 
@@ -58,20 +58,20 @@ read it.
 cp .env.example .env
 ```
 
-| Variable              | Purpose                          | Default                                 |
-| --------------------- | -------------------------------- | --------------------------------------- |
-| `MONGODB_URI`         | MongoDB connection string        | `mongodb://127.0.0.1:27017/projectflow` |
-| `JWT_SECRET`          | Signing secret for access tokens | — (required)                            |
-| `JWT_EXPIRES_IN`      | Access token lifetime            | `7d`                                    |
-| `API_PORT`            | Port the API listens on          | `4732`                                  |
-| `WEB_ORIGIN`          | Origin allowed by CORS           | `http://localhost:3742`                 |
-| `NEXT_PUBLIC_API_URL` | API base URL used by the browser | `http://localhost:4732`                 |
+| Variable              | Purpose                          | Default                                                |
+| --------------------- | -------------------------------- | ------------------------------------------------------ |
+| `MONGODB_URI`         | MongoDB connection string        | `mongodb://localhost:27018/projectflow?replicaSet=rs0` |
+| `JWT_SECRET`          | Signing secret for access tokens | — (required)                                           |
+| `JWT_EXPIRES_IN`      | Access token lifetime            | `7d`                                                   |
+| `API_PORT`            | Port the API listens on          | `4732`                                                 |
+| `WEB_ORIGIN`          | Origin allowed by CORS           | `http://localhost:3742`                                |
+| `NEXT_PUBLIC_API_URL` | API base URL used by the browser | `http://localhost:4732`                                |
 
 The API refuses to boot if `MONGODB_URI` or `JWT_SECRET` is missing.
 
 ## Database
 
-Make sure MongoDB is running, then load development data:
+Initialize the replica set described below and point `.env` to it, then load development data:
 
 ```bash
 pnpm seed
@@ -112,6 +112,7 @@ pnpm --filter @projectflow/web dev
 ```bash
 pnpm install
 cp .env.example .env
+# Set JWT_SECRET and initialize the local replica set described below.
 pnpm seed
 pnpm dev
 ```
@@ -132,7 +133,7 @@ pnpm dev
 
 `pnpm test` does not need a running MongoDB — it starts a throwaway in-memory
 server for the duration of the run. The first run downloads a MongoDB binary
-(around 100 MB) and caches it.
+(size varies by version/platform; the Windows download can exceed 700 MB) and caches it.
 
 ---
 
@@ -239,6 +240,8 @@ POST   /projects/:projectId/tasks
 GET    /tasks/:taskId
 PATCH  /tasks/:taskId
 PATCH  /tasks/:taskId/status
+PATCH  /tasks/:taskId/assignee
+GET    /tasks/:taskId/activity
 DELETE /tasks/:taskId
 
 GET    /tasks/:taskId/comments
@@ -316,3 +319,24 @@ pnpm --filter @projectflow/web test:browser
 ```
 
 An installed Chrome can be used instead: set `PLAYWRIGHT_CHANNEL=chrome` in your shell. Tests start their own Next.js server on port 3743 with a mocked API origin on port 4734; keep port 3743 free. Browser tests use a separate `.next-browser` output directory. Screenshots/traces on failure go under ignored `test-results/`.
+
+## Known limitations and evaluation
+
+- The board loads at most 100 tasks. Activity uses offset pagination, so concurrently inserted events can shift page boundaries; refresh reloads the timeline. Only assignment changes are logged.
+- Membership removal, assignment notifications, real-time subscriptions, retention/archival jobs, and session-storage redesign are future work, discussed in ASSESSMENT_NOTES.md.
+- Task/history transactions require replica-set MongoDB. Do not apply the numbering migration while task writers are running. Existing duplicate numbers stop migration and require deliberate repair.
+- Browser tests use deterministic API fixtures; MongoDB-backed API tests cover backend integration separately. A live deployment is optional and was not created by this work.
+- Next.js generates `next-env.d.ts` for the current output directory when running dev/build/browser checks; generated-path changes are not hand-authored application changes.
+- Run `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, and `pnpm --filter @projectflow/web test:browser`. API type checking includes tests; browser test types are checked separately by the web typecheck script. The first MongoDB/browser installation may need network access; an installed MongoDB executable and Chrome may be selected as documented above.
+
+The work is split into five dependent PRs: authorization, assignment/history consistency, concurrent numbering, frontend, and validation/documentation. The first four PRs were merged by the repository owner during implementation; phases 2-4 were merged into their predecessor branches. The final validation/documentation PR therefore targets main and integrates the remaining series. The implementation agent did not merge PRs. The candidate's original feature work remains in `aa5e8d1` before this series.
+
+### Verification recorded on 11 September 2026
+
+- `pnpm typecheck`, `pnpm lint`, and `pnpm build` passed.
+- The API suite passed 42 tests across 5 suites using a disposable MongoDB replica set and the installed MongoDB 8.3 executable.
+- All 5 Playwright tests passed in installed Chrome, covering mocked success, pending, rejection/retry, permissions, pagination, and mobile layout.
+- A separate temporary smoke harness ran production Next.js with compiled NestJS and freshly seeded isolated MongoDB. Real login, browser assignment/unassignment, and the resulting two persisted activity records were verified; desktop and mobile screenshots were inspected.
+- Targeted credential-pattern scanning found no credential-bearing MongoDB URLs, GitHub tokens, or private-key blocks in tracked files. `.env` and `.env.production` did not appear in repository history. This is a targeted check, not a comprehensive security audit.
+
+Verification was performed in this Windows workspace, not on an independent clean machine. The temporary live smoke harness is not part of the committed automated suite; the reproducible committed tests are the API and Playwright commands above.

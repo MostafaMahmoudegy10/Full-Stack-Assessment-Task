@@ -8,7 +8,7 @@
     "start": "node scripts/with-env.js start",
     "lint": "eslint src test playwright.config.ts",
     "test:browser": "playwright test",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.browser.json --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.1",

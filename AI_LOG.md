@@ -1,29 +1,27 @@
-## Previous AI Interaction
+# AI usage log
 
-**My prompt:**
-I provided my own answer to the assessment question "How is the application structured, and what are the major modules?" in rough English, and asked the AI to fix the syntax and write it into `ASSESSMENT_NOTES.md`.
+## Tools used
 
-**AI response summary:**
-The AI took my draft, corrected grammar and spelling, and structured it into clear sections (backend structure, frontend structure, major modules) while keeping my original meaning and voice.
+Codex was used for this repository review and five-phase implementation. Earlier AI interactions recorded by the candidate involved help formatting the architecture explanation and assistance around assignment/activity; the earlier log did not identify the assistant by product name.
 
-**What I did:**
-Reviewed the formatted output, confirmed it matched my understanding of the codebase, and accepted the write to the file.
+## How AI was used
 
-**Where it was applied:**
-- `ASSESSMENT_NOTES.md` — the answer to the first assessment question.
+- Read the assessment and compare the working repository with upstream `engtechno/Full-Stack-Assessment-Task` at `27c84d8`.
+- Review gaps, discuss self-unassignment and transaction consistency, implement the agreed phases, generate regression/browser tests, investigate test failures, and draft documentation/PR descriptions.
+- Run TypeScript, lint, MongoDB-backed API tests, and Playwright browser checks; visually inspect the mobile result. Also run a temporary smoke harness against production Next.js, compiled NestJS, and an isolated real replica set, verifying persisted assignment/unassignment history.
+- The candidate authored the assignment/activity foundation in `aa5e8d1`. The later candidate commit `9432dd2` also contains the ID tie-breaker activity index and debug-log cleanup. The five subsequent PRs extend that candidate work. It must not be represented as functionality inherited from the starter or as newly invented by this implementation pass.
 
-## Example AI Interaction
+## Suggestions rejected or significantly changed
 
-**What I asked:**
-I asked for task assignment and unassignment with project-membership validation, role-based permissions, assignee-change activity logging, and a paginated activity endpoint.
+- The candidate rejected the review's framing that assignment/activity were merely pre-existing functionality to fix. Comparison with upstream confirmed their authorship, and the notes and PR descriptions were corrected accordingly.
+- The standalone-MongoDB option with separate task/activity writes was not selected. The candidate chose transactional writes and accepted replica-set setup to avoid partial history.
+- The initial mobile layout left assignment below the entire timeline. Visual review led to moving assignment controls before the long content on small screens.
 
-**AI response summary:**
-The AI added the assignment service flow, validated request DTOs, controller endpoints, assignee-change logging, and an authorized activity query optimized with batching and an index.
+## Generated code modified
 
-**What I implemented:**
-I applied the requested assignment rules and added latest-first activity pagination without per-record actor queries.
+- The first browser setup reused `.next`; Windows reported a file-lock/rename error. It was changed to use an isolated `.next-browser` output directory.
+- The first browser URL used `127.0.0.1`, which Next.js rejected for its dev HMR connection. The test page origin was changed to `localhost` so hydration and API fixtures could run normally.
+- The initial failed-save test matched every alert, including Next.js's route announcer. The locator was narrowed to the assignment error. The rerun verified the retained value and successful retry.
+- The existing candidate implementation was extended to normalize IDs, permit self-unassignment, remove the unsupported completed-task restriction, and write activity transactionally. These are incremental changes to the candidate's feature, not a claim that assignment/history came from the starter.
 
-**Where it was applied:**
-- `TasksService`
-- `TasksController`
-- task assignment and activity DTOs, activity schema, and shared API types
+This log records work performed and decisions made in the session. It does not claim the candidate has already reviewed every generated line or invent an earlier rejected suggestion. The candidate remains responsible for reviewing and explaining the submission.

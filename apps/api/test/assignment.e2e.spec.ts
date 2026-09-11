@@ -9,6 +9,7 @@ import {
   type TaskActivityEntry,
 } from '@projectflow/shared';
 import { Activity, type ActivityDocument } from '../src/tasks/schemas/activity.schema';
+import { UsersService } from '../src/users/users.service';
 import { createTestApp, resetDatabase } from './utils/test-app';
 import {
   addOrganizationMember,
@@ -210,5 +211,35 @@ describe('Task assignment and history', () => {
       .set('Authorization', authHeader(owner))
       .expect(204);
     expect(await connection.collection('activities').countDocuments()).toBe(0);
+  });
+
+  it('resolves actors and assignees in one batch rather than per activity', async () => {
+    await assign(owner, member.id).expect(200);
+    await assign(owner, manager.id).expect(200);
+    const lookup = jest.spyOn(app.get(UsersService), 'findManyByIds');
+    try {
+      await history().expect(200);
+      expect(lookup).toHaveBeenCalledTimes(1);
+      const ids = lookup.mock.calls[0]![0].map((id) => id.toString());
+      expect(new Set(ids)).toEqual(new Set([owner.id, member.id, manager.id]));
+    } finally {
+      lookup.mockRestore();
+    }
+  });
+
+  it('uses the activity ID to paginate deterministically when timestamps tie', async () => {
+    await assign(owner, member.id).expect(200);
+    await assign(owner, manager.id).expect(200);
+    await assign(owner, null).expect(200);
+    await connection
+      .collection('activities')
+      .updateMany({}, { $set: { createdAt: new Date('2026-09-11T00:00:00Z') } });
+    const first = await history(member, 1, 2).expect(200);
+    const second = await history(member, 2, 2).expect(200);
+    const ids = [...first.body.items, ...second.body.items].map(
+      (entry: TaskActivityEntry) => entry.id,
+    );
+    expect(new Set(ids).size).toBe(3);
+    expect(ids).toEqual([...ids].sort().reverse());
   });
 });
