@@ -1,240 +1,213 @@
 # ProjectFlow
 
-ProjectFlow is a lightweight project and task tracker for software teams.
-Organizations own projects, projects own tasks, and tasks carry a status, a
-priority and a discussion thread.
+ProjectFlow is a project and task tracker built with **Next.js, NestJS, and MongoDB** in a TypeScript monorepo. Organizations contain projects, projects contain tasks, and tasks have a creator, an optional assignee, comments, and assignment history.
 
-It is a TypeScript monorepo: a NestJS + MongoDB API and a Next.js App Router
-frontend, sharing a small package of domain types and enums.
+## Current implementation
 
----
+All five implementation phases have been merged into `main`. The required feature and production fixes are implemented; a public deployment has not been created or verified.
 
-## Technology stack
+| Area                         | Implemented behavior                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Task assignment              | Project-member eligibility, elevated-role assignment, member self-assignment and self-unassignment, nullable assignee                       |
+| Assignment history           | Atomic task/history writes, all three transitions, no-op suppression, actor and assignee names                                              |
+| Activity API                 | Authorized access, newest-first pagination, deterministic timestamp/ID ordering, batched user lookup, compound index                        |
+| Frontend                     | Assignee selector, search for larger member lists, permission/pending/error states, paginated readable history, keyboard and mobile support |
+| Production authorization fix | Status mutations now check project access; outsider and cross-organization regression coverage                                              |
+| Concurrent numbering         | Atomic project counters, unique project/number index, safe migration for existing data                                                      |
+| Verification                 | 42 API tests, 5 browser tests, type checking, lint, production build, and a real API/database smoke check passed                            |
+| Assessment documents         | Architecture/risks, bug investigation, code review, scaling discussion, AI log, and prioritized reflection                                  |
 
-| Area         | Choice                                           |
-| ------------ | ------------------------------------------------ |
-| Monorepo     | pnpm workspaces + Turborepo                      |
-| Language     | TypeScript 5.9                                   |
-| API          | NestJS 11, Mongoose 8, MongoDB                   |
-| Auth         | JWT bearer tokens, bcrypt password hashing       |
-| Web          | Next.js 16 (App Router), React 19                |
-| Styling      | Tailwind CSS 4, Radix primitives, Phosphor Icons |
-| Server state | TanStack Query 5                                 |
-| Forms        | React Hook Form + Zod                            |
-| Testing      | Jest, Supertest, mongodb-memory-server           |
+### Authorship and review history
 
----
+The candidate authored the assignment/activity foundation in `aa5e8d1`, extending [the upstream starter](https://github.com/engtechno/Full-Stack-Assessment-Task) at `27c84d8`. The candidate's `9432dd2` also added the activity ID tie-breaker index and removed debug logging. These features were candidate additions, not starter functionality. Subsequent assisted work completed permissions, transactions, UI, tests, and documentation.
 
-## Prerequisites
+| Phase                                              | Pull request                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 1. Task mutation authorization                     | [#2](https://github.com/MostafaMahmoudegy10/Full-Stack-Assessment-Task/pull/2) |
+| 2. Assignment and activity consistency             | [#3](https://github.com/MostafaMahmoudegy10/Full-Stack-Assessment-Task/pull/3) |
+| 3. Concurrent numbering and migration              | [#4](https://github.com/MostafaMahmoudegy10/Full-Stack-Assessment-Task/pull/4) |
+| 4. Assignee selector and activity timeline         | [#5](https://github.com/MostafaMahmoudegy10/Full-Stack-Assessment-Task/pull/5) |
+| 5. Validation, documentation, and main integration | [#6](https://github.com/MostafaMahmoudegy10/Full-Stack-Assessment-Task/pull/6) |
 
-- **Node.js 20.19+** (22 or 24 recommended)
-- **pnpm 10+** — `npm install -g pnpm`
-- **MongoDB 7+ replica set** running locally (see replica-set setup below)
+## Technology and architecture
 
-On macOS:
+| Area           | Technology                                         |
+| -------------- | -------------------------------------------------- |
+| Workspace      | pnpm 10.33.0, Turborepo, TypeScript 5.9            |
+| API            | NestJS 11, Mongoose 8, MongoDB replica set         |
+| Authentication | JWT bearer tokens and bcrypt password hashing      |
+| Web            | Next.js 16 App Router, React 19                    |
+| UI and forms   | Tailwind CSS 4, Radix, React Hook Form, Zod        |
+| Server state   | TanStack Query 5                                   |
+| Tests          | Jest, Supertest, mongodb-memory-server, Playwright |
 
-```bash
-brew tap mongodb/brew
-brew install mongodb-community@7.0
-brew services start mongodb-community@7.0
+```text
+apps/api/src/       Controllers, DTOs, domain services, Mongoose schemas, database utilities
+apps/api/test/      API integration tests and isolated database fixtures
+apps/web/src/      App Router pages, reusable UI, feature components and query hooks
+apps/web/test/     Playwright browser tests
+packages/shared/  Shared domain enums and API response types
+packages/         Shared TypeScript and ESLint configuration
 ```
 
-A reachable MongoDB replica set or Atlas deployment works — point `MONGODB_URI` wherever you like.
+API modules follow controller -> service -> Mongoose model. Business rules live in services. `ProjectAccessService` centralizes project authorization; the JWT guard runs globally except on public routes. Memberships are separate collections with unique compound indexes. Tasks reference their project, creator, and optional assignee; activity records reference their task and actor.
 
----
+The web API client supplies bearer tokens and normalizes errors. Feature hooks own queries and mutations; shared query keys control cache updates. See [ASSESSMENT_NOTES.md](ASSESSMENT_NOTES.md) for the architecture explanation and decisions.
 
-## Installation
+## Local setup
+
+### 1. Prerequisites and installation
+
+Install Node.js 20.19+ (22 or 24 recommended), pnpm 10.33.0, and either local MongoDB 7+ with `mongosh` or an accessible MongoDB Atlas cluster. Transactions require a replica set; a standalone MongoDB server is insufficient.
+
+From the repository root:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
-## Environment setup
-
-Configuration lives in a single `.env` file at the repository root; both apps
-read it.
+Copy the environment template:
 
 ```bash
+# macOS/Linux
 cp .env.example .env
 ```
 
-| Variable              | Purpose                          | Default                                                |
-| --------------------- | -------------------------------- | ------------------------------------------------------ |
-| `MONGODB_URI`         | MongoDB connection string        | `mongodb://localhost:27018/projectflow?replicaSet=rs0` |
-| `JWT_SECRET`          | Signing secret for access tokens | — (required)                                           |
-| `JWT_EXPIRES_IN`      | Access token lifetime            | `7d`                                                   |
-| `API_PORT`            | Port the API listens on          | `4732`                                                 |
-| `WEB_ORIGIN`          | Origin allowed by CORS           | `http://localhost:3742`                                |
-| `NEXT_PUBLIC_API_URL` | API base URL used by the browser | `http://localhost:4732`                                |
+```powershell
+# Windows PowerShell
+Copy-Item .env.example .env
+```
 
-The API refuses to boot if `MONGODB_URI` or `JWT_SECRET` is missing.
+Replace the development `JWT_SECRET` with your own value. Both apps read root `.env`; hosted environments should supply variables through their provider's environment settings.
 
-## Database
+| Variable              | Meaning                                              | Local template/default                                                 |
+| --------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------- |
+| `MONGODB_URI`         | Replica-set database connection; required            | `mongodb://localhost:27018/projectflow?replicaSet=rs0` in the template |
+| `JWT_SECRET`          | Token-signing secret; required                       | Replace the development placeholder                                    |
+| `JWT_EXPIRES_IN`      | Access-token lifetime                                | `7d`                                                                   |
+| `API_PORT`            | Local API listening port                             | `4732`                                                                 |
+| `WEB_ORIGIN`          | Frontend origin allowed by API CORS                  | `http://localhost:3742`                                                |
+| `NEXT_PUBLIC_API_URL` | API URL used by the browser, including at build time | `http://localhost:4732`                                                |
+| `WEB_PORT`            | Optional port used by the web dev/start helper       | `3742`                                                                 |
 
-Initialize the replica set described below and point `.env` to it, then load development data:
+Keep URLs as plain values. Use `#` for dotenv comments; `//` after a URL becomes part of the value. Do not commit private environment files or use the development secret in a public deployment.
+
+### 2. Initialize MongoDB
+
+For Atlas, configure database access/network access and set `MONGODB_URI` to that cluster's connection string, including a database name. Skip the local commands below.
+
+For local MongoDB, create a dedicated data directory:
+
+```bash
+# macOS/Linux
+mkdir -p .local/mongo
+```
+
+```powershell
+# Windows PowerShell
+New-Item -ItemType Directory -Force .local/mongo
+```
+
+Start MongoDB in one terminal and leave it running:
+
+```bash
+mongod --replSet rs0 --bind_ip 127.0.0.1 --port 27018 --dbpath .local/mongo
+```
+
+In a second terminal, open the MongoDB shell:
+
+```bash
+mongosh --host localhost --port 27018
+```
+
+Run this JavaScript **inside mongosh**, once for this data directory:
+
+```javascript
+rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27018' }] });
+```
+
+Wait for the node to become PRIMARY; `rs.status().myState` should return `1`. The `.env.example` URI matches this configuration. Keep the local instance bound to localhost.
+
+### 3. Seed and start
 
 ```bash
 pnpm seed
-```
-
-The seed is repeatable — it clears the ProjectFlow collections and reinserts a
-fresh organization, users, projects, tasks and comments.
-
-## Running the apps
-
-```bash
 pnpm dev
 ```
 
-- Web — <http://localhost:3742>
-- API — <http://localhost:4732>
+`pnpm seed` builds the API and its dependencies, then **clears users, organizations, memberships, projects, tasks, comments, and activities in the configured database** and inserts development data. It also initializes task counters. Use it only with a disposable development/demo database, never as a production migration.
 
-Both apps deliberately avoid the usual 3000/4000 defaults so they do not clash
-with other projects. To move the web app, set `WEB_PORT` in your shell and
-update `WEB_ORIGIN` in `.env` to match, so CORS keeps working:
+- Web: <http://localhost:3742>
+- API: <http://localhost:4732>
 
-```bash
-WEB_PORT=3800 pnpm --filter @projectflow/web dev
-```
-
-The API port comes from `API_PORT` in `.env`; change `NEXT_PUBLIC_API_URL` to
-match if you move it.
-
-Run one at a time if you prefer:
+To run apps separately:
 
 ```bash
 pnpm --filter @projectflow/api dev
 pnpm --filter @projectflow/web dev
 ```
 
-## From a clean checkout
+If changing ports, update `API_PORT`, `WEB_PORT`, `WEB_ORIGIN`, and `NEXT_PUBLIC_API_URL` consistently. Restart/rebuild the frontend when changing its API URL.
+
+### Development accounts
+
+The seed creates these local-only accounts with password `Password123!`:
+
+| Name         | Email                 | Access                 |
+| ------------ | --------------------- | ---------------------- |
+| Ammar Yaser  | `ammar@example.com`   | Organization owner     |
+| Sarah Ahmed  | `sarah@example.com`   | Organization admin     |
+| Ahmed Hassan | `ahmed@example.com`   | Project manager on ENG |
+| Magd Ali     | `magd@example.com`    | Member of ENG and WEB  |
+| Outside User | `outside@example.com` | No organization        |
+
+Organization owners/admins can manage assignments without explicit project membership, but they are eligible assignees only when they are project members themselves.
+
+## Assignment and activity behavior
+
+- Owners, admins, and project managers can assign project members and remove any assignee.
+- Regular project members can assign themselves, including replacing another assignee, and remove their own assignment. They cannot assign another person or remove someone else's assignment.
+- Assignment is available in every task status, including DONE. Creator and assignee remain separate concepts.
+- Assignment changes and their activity records commit in one MongoDB transaction. Retries reread the previous assignee; assigning the same user again creates no duplicate event.
+- Task deletion removes comments and history transactionally. Missing referenced users retain their IDs and display as Unknown user.
+- Activity is newest-first, paginated, authorized, and resolved using batched user queries with a `(task, createdAt desc, _id desc)` index.
+- Task responses preserve `assignedTo` and add an assignee summary. Activity preserves `metadata.from/to` IDs and includes previous/new assignee summaries.
+
+The frontend uses server-confirmed saves: controls are disabled while pending, failed requests retain the displayed value, and successful requests update task data and invalidate task-list/history queries. Managers can search name/email when a project has more than eight members. Assignment controls appear above long content on mobile.
+
+## Concurrent numbering and migration
+
+Task numbers are reserved with atomic `$inc` on a project counter. A unique `(projectId, number)` index enforces uniqueness. Deletion does not reuse numbers; failed inserts can leave gaps. Keys such as ENG-1 are project-specific rather than globally unique across organizations.
+
+For an existing database, stop API writers and take a backup before applying the migration:
 
 ```bash
-pnpm install
-cp .env.example .env
-# Set JWT_SECRET and initialize the local replica set described below.
-pnpm seed
-pnpm dev
+# Build the API together with its shared dependency.
+pnpm exec turbo run build --filter=@projectflow/api
+
+# Inspection only: does not modify data.
+pnpm --filter @projectflow/api migrate:task-numbering
+
+# Apply only while task writers are stopped.
+pnpm --filter @projectflow/api migrate:task-numbering --apply
 ```
 
----
+The migration detects duplicate legacy numbers and stops before modifying data if any exist. Resolve duplicates deliberately; it never silently renumbers tasks. It initializes counters from the maximum existing number, preserves larger counters, and replaces only the old nonunique project/number index. Reruns are safe with writers stopped. A fresh seed initializes counters automatically.
 
-## Commands
+## API routes
 
-| Command          | Description                                |
-| ---------------- | ------------------------------------------ |
-| `pnpm dev`       | Run the API and web app in watch mode      |
-| `pnpm build`     | Build every package and app                |
-| `pnpm lint`      | ESLint across the workspace                |
-| `pnpm typecheck` | TypeScript project-wide, no emit           |
-| `pnpm test`      | API test suite (uses an in-memory MongoDB) |
-| `pnpm seed`      | Reset and reload development data          |
-| `pnpm format`    | Prettier write                             |
+All routes require a bearer token except register/login.
 
-`pnpm test` does not need a running MongoDB — it starts a throwaway in-memory
-server for the duration of the run. The first run downloads a MongoDB binary
-(size varies by version/platform; the Windows download can exceed 700 MB) and caches it.
-
----
-
-## Development credentials
-
-Seeded accounts, all sharing the password `Password123!`:
-
-| Name         | Email                 | Access                    |
-| ------------ | --------------------- | ------------------------- |
-| Ammar Yaser  | `ammar@example.com`   | Organization owner        |
-| Sarah Ahmed  | `sarah@example.com`   | Organization admin        |
-| Ahmed Hassan | `ahmed@example.com`   | Project manager on `ENG`  |
-| Magd Ali     | `magd@example.com`    | Member of `ENG` and `WEB` |
-| Outside User | `outside@example.com` | No organization           |
-
-These are local development accounts only.
-
----
-
-## Architecture
-
-```
-projectflow/
-├── apps/
-│   ├── api/                     NestJS API
-│   │   ├── src/
-│   │   │   ├── auth/            register / login / current user
-│   │   │   ├── users/
-│   │   │   ├── organizations/
-│   │   │   ├── organization-members/
-│   │   │   ├── projects/        projects + ProjectAccessService
-│   │   │   ├── project-members/
-│   │   │   ├── tasks/
-│   │   │   ├── comments/
-│   │   │   ├── common/          guards, decorators, filters, shared DTOs
-│   │   │   └── database/seed.ts
-│   │   └── test/                e2e suites and fixtures
-│   │
-│   └── web/                     Next.js App Router frontend
-│       └── src/
-│           ├── app/             routes and layouts
-│           ├── components/      design system primitives + app shell
-│           ├── features/        auth, projects, tasks, comments
-│           ├── lib/             API client, query keys, formatting
-│           └── providers/       TanStack Query provider
-│
-└── packages/
-    ├── shared/                  enums, constants, API response types
-    ├── eslint-config/           flat ESLint configs
-    └── tsconfig/                base TypeScript configs
-```
-
-### API layering
-
-Each module follows the same shape: controller → service → Mongoose model, with
-DTOs validating input at the boundary. Controllers stay thin; business rules
-live in services.
-
-### Domain model
-
-```
-User
-Organization        ── OrganizationMember ── User      (OWNER | ADMIN | MEMBER)
-Organization  ── Project
-Project             ── ProjectMember      ── User      (PROJECT_MANAGER | MEMBER)
-Project       ── Task ── Comment
-```
-
-Membership is stored in its own collection rather than as arrays on the parent
-document, so it can be indexed and queried directly. Both membership
-collections carry a unique compound index on their two foreign keys.
-
-Tasks are numbered per project and identified by a human-readable key derived
-from the project key: `ENG-1`, `ENG-2`, `WEB-1`.
-
-### Authorization
-
-`ProjectAccessService` answers "may this user touch this project?" in one
-place. Access comes from either an elevated organization role (`OWNER` or
-`ADMIN`, which grants access to every project in the organization) or an
-explicit project membership row. `assertCanView` gates reads, `assertCanManage`
-gates configuration and membership changes.
-
-Authentication is a JWT bearer token. `JwtAuthGuard` is registered globally;
-routes opt out with the `@Public()` decorator.
-
-### API surface
-
-```
+```text
 POST   /auth/register
 POST   /auth/login
 GET    /auth/me
-
 GET    /organizations
-
 GET    /projects
 POST   /projects
 GET    /projects/:projectId
 GET    /projects/:projectId/members
 POST   /projects/:projectId/members
-
 GET    /projects/:projectId/tasks
 POST   /projects/:projectId/tasks
 GET    /tasks/:taskId
@@ -243,100 +216,96 @@ PATCH  /tasks/:taskId/status
 PATCH  /tasks/:taskId/assignee
 GET    /tasks/:taskId/activity
 DELETE /tasks/:taskId
-
 GET    /tasks/:taskId/comments
 POST   /tasks/:taskId/comments
 ```
 
-Errors share one shape:
+Assignment accepts `{ "assigneeId": "USER_ID" }` or `{ "assigneeId": null }`. Activity accepts `page` and `pageSize` and returns `{ items, total, page, pageSize }`. Errors use `{ statusCode, message, error }`.
 
-```json
-{
-  "statusCode": 403,
-  "message": "You do not have access to this project",
-  "error": "Forbidden"
-}
-```
+## Verification and commands
 
-### Frontend
-
-Routes are thin; the work happens in `features/`. Server state is owned by
-TanStack Query — query keys live in `lib/query-keys.ts` so invalidation stays
-predictable — and local UI state stays in React. The API client in
-`lib/api-client.ts` centralises the base URL, the auth header and error
-parsing.
-
-Components are server components by default; `"use client"` is added only where
-interactivity or hooks require it.
-
-## Assignment and activity (candidate extension)
-
-The candidate implemented task assignment and activity history in `aa5e8d1`, extending upstream starter `27c84d8`. Subsequent work builds on that implementation with self-unassignment, transactional consistency, frontend integration, and regression tests.
-
-- `PATCH /tasks/:taskId/assignee` accepts `{ "assigneeId": "USER_ID" }` or `{ "assigneeId": null }`.
-- `GET /tasks/:taskId/activity?page=1&pageSize=20` returns newest-first history with actors and previous/new assignee summaries.
-- Owners/admins/project managers can assign project members and unassign anyone. Members can assign themselves (including replacing an assignee) and remove their own assignment. Completed tasks follow the same rules.
-- Task assignment and activity insertion commit in one transaction. Task deletion also removes comments/history transactionally. Repeated assignment to the same user creates no activity.
-
-### MongoDB replica set required
-
-Transactions require a replica set (MongoDB Atlas is also suitable). For local development, use a dedicated data directory and port to avoid changing another MongoDB instance:
+Run from the repository root:
 
 ```bash
-mkdir -p .local/mongo
-mongod --replSet rs0 --bind_ip 127.0.0.1 --port 27018 --dbpath .local/mongo
-# In another terminal, initialize once:
-mongosh --port 27018 --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27018"}]})'
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm test
 ```
 
-On Windows create `.local/mongo` with `New-Item -ItemType Directory -Force .local/mongo`, then run the same `mongod`/`mongosh` commands. Set `MONGODB_URI=mongodb://localhost:27018/projectflow?replicaSet=rs0` in your root `.env`. Keep MongoDB bound to localhost.
+Building first generates shared declarations and Next.js route types. API type checking includes its tests; web type checking also checks browser tests. `pnpm format:check` checks formatting and `pnpm format` rewrites it.
 
-Tests create a disposable one-node replica set and never use the development database. If MongoDB is installed already, set `MONGOMS_SYSTEM_BINARY` to the absolute `mongod` executable path to avoid a download. Set `MONGOMS_SYSTEM_BINARY_VERSION_CHECK=false` if intentionally using a different locally installed version. Run the API test command directly when using these environment overrides: `pnpm --filter @projectflow/api test`.
+API tests start a disposable MongoDB replica set and do not use the development database. The first run downloads a MongoDB binary; download size varies and can exceed 700 MB on Windows. To use an installed executable instead, set `MONGOMS_SYSTEM_BINARY`. If deliberately using a different MongoDB version, also set `MONGOMS_SYSTEM_BINARY_VERSION_CHECK=false` and run the API test script directly so Turbo does not filter these overrides:
 
-## Concurrent task numbering and existing databases
-
-Numbers are reserved with atomic `$inc` on a project counter. A unique `(projectId, number)` index is the database backstop. Numbers are project-specific, never reused after deletion, and may have gaps if a later task insertion fails. Separate organizations can use the same project key; task keys are not globally unique.
-
-For an existing database, stop API writers and take a backup before applying this migration. It reports duplicate numbers and stops without modifying data if any exist; resolve those deliberately before continuing. It never silently renumbers tasks. It preserves larger counters, initializes missing counters from the highest existing number, and replaces only the old project/number index. Rerunning it is safe while writes remain paused.
-
-```bash
-pnpm --filter @projectflow/api build
-pnpm --filter @projectflow/api migrate:task-numbering          # inspect only
-pnpm --filter @projectflow/api migrate:task-numbering --apply  # apply with writes stopped
+```powershell
+$env:MONGOMS_SYSTEM_BINARY = 'C:/Program Files/MongoDB/Server/8.3/bin/mongod.exe'
+$env:MONGOMS_SYSTEM_BINARY_VERSION_CHECK = 'false'
+pnpm --filter @projectflow/api test
 ```
 
-A fresh seed initializes counters automatically. If migration fails, keep writers stopped, resolve the reported problem, and rerun; do not resume the old count-based writer against the new index.
+Use the path/version installed on your machine; the example above is the verified Windows environment.
 
-## Frontend assignment and browser tests
-
-The task details page has an assignee selector and paginated activity timeline. Managers can search name/email when a project has more than eight members. Members see the self-assignment/unassignment options allowed by the backend. Saving is server-confirmed: controls are disabled while pending, failures retain the previous value, and success updates task data and invalidates task-list/activity caches. This avoids optimistic rollback complexity for authorization failures and transaction retries.
-
-Browser tests use Playwright against a real Next.js page with deterministic API fixtures, including permission failures and delayed saves. They do not contact your database. Playwright is a development-only dependency added to test keyboard interaction, responsive layout, and server-state updates in a browser.
+For browser tests:
 
 ```bash
 pnpm --filter @projectflow/web exec playwright install chromium
 pnpm --filter @projectflow/web test:browser
 ```
 
-An installed Chrome can be used instead: set `PLAYWRIGHT_CHANNEL=chrome` in your shell. Tests start their own Next.js server on port 3743 with a mocked API origin on port 4734; keep port 3743 free. Browser tests use a separate `.next-browser` output directory. Screenshots/traces on failure go under ignored `test-results/`.
+Alternatively set `PLAYWRIGHT_CHANNEL=chrome` to use installed Chrome (`$env:PLAYWRIGHT_CHANNEL='chrome'` in PowerShell). Playwright starts Next.js on `localhost:3743`, uses deterministic API fixtures on port 4734, and writes to a separate `.next-browser` directory. Keep port 3743 free. Failure screenshots/traces are saved under ignored `test-results/`.
 
-## Known limitations and evaluation
+### Recorded results: 11 September 2026
 
-- The board loads at most 100 tasks. Activity uses offset pagination, so concurrently inserted events can shift page boundaries; refresh reloads the timeline. Only assignment changes are logged.
-- Membership removal, assignment notifications, real-time subscriptions, retention/archival jobs, and session-storage redesign are future work, discussed in ASSESSMENT_NOTES.md.
-- Task/history transactions require replica-set MongoDB. Do not apply the numbering migration while task writers are running. Existing duplicate numbers stop migration and require deliberate repair.
-- Browser tests use deterministic API fixtures; MongoDB-backed API tests cover backend integration separately. A live deployment is optional and was not created by this work.
-- Next.js generates `next-env.d.ts` for the current output directory when running dev/build/browser checks; generated-path changes are not hand-authored application changes.
-- Run `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, and `pnpm --filter @projectflow/web test:browser`. API type checking includes tests; browser test types are checked separately by the web typecheck script. The first MongoDB/browser installation may need network access; an installed MongoDB executable and Chrome may be selected as documented above.
+| Check                        | Result                                                                                                                                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| API integration tests        | 42 passed across 5 suites with isolated replica-set MongoDB                                                                            |
+| Playwright                   | 5 passed in Chrome: assignment, failure/retry, keyboard/permissions, pagination/mobile, empty/error recovery                           |
+| TypeScript and ESLint        | Passed                                                                                                                                 |
+| Production build             | Passed for API, web, and shared package                                                                                                |
+| Real application smoke check | Production Next.js + compiled NestJS + seeded isolated MongoDB: login, browser assignment/unassignment, and persisted history verified |
+| Visual review                | Desktop and mobile screenshots inspected                                                                                               |
 
-The work is split into five dependent PRs: authorization, assignment/history consistency, concurrent numbering, frontend, and validation/documentation. The first four PRs were merged by the repository owner during implementation; phases 2-4 were merged into their predecessor branches. The final validation/documentation PR therefore targets main and integrates the remaining series. The implementation agent did not merge PRs. The candidate's original feature work remains in `aa5e8d1` before this series.
+The real application smoke check used a temporary harness; the committed repeatable suites are Jest and Playwright. Verification was performed in this Windows workspace, not on an independent clean machine. A targeted tracked-file scan found no credential-bearing MongoDB URLs, GitHub tokens, or private-key blocks; private `.env` files were absent from repository history. This is not a comprehensive security audit.
 
-### Verification recorded on 11 September 2026
+## Assessment deliverables
 
-- `pnpm typecheck`, `pnpm lint`, and `pnpm build` passed.
-- The API suite passed 42 tests across 5 suites using a disposable MongoDB replica set and the installed MongoDB 8.3 executable.
-- All 5 Playwright tests passed in installed Chrome, covering mocked success, pending, rejection/retry, permissions, pagination, and mobile layout.
-- A separate temporary smoke harness ran production Next.js with compiled NestJS and freshly seeded isolated MongoDB. Real login, browser assignment/unassignment, and the resulting two persisted activity records were verified; desktop and mobile screenshots were inspected.
-- Targeted credential-pattern scanning found no credential-bearing MongoDB URLs, GitHub tokens, or private-key blocks in tracked files. `.env` and `.env.production` did not appear in repository history. This is a targeted check, not a comprehensive security audit.
+| PDF requirement                          | Evidence                                                               |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| Understand the system and identify risks | [ASSESSMENT_NOTES.md](ASSESSMENT_NOTES.md)                             |
+| Task assignment                          | Task schema, assignment DTO/service/endpoint, permission tests         |
+| Activity history and API                 | Activity schema, transactional writes, pagination/index/batching tests |
+| Frontend implementation                  | Assignee selector, activity timeline, Playwright tests                 |
+| Production bug                           | [BUG_REPORT.md](BUG_REPORT.md), authorization regression tests         |
+| Concurrent task creation                 | Atomic counter, unique index, migration, parallel-create tests         |
+| Meaningful testing                       | `apps/api/test` and `apps/web/test/browser`                            |
+| Code review exercise                     | Code Review section in assessment notes                                |
+| Scaling question                         | Scaling the Activity System section in assessment notes                |
+| AI usage and final reflection            | [AI_LOG.md](AI_LOG.md), If I Had Two More Days section in notes        |
+| Setup and schema changes                 | This README, `.env.example`, schemas and migration                     |
 
-Verification was performed in this Windows workspace, not on an independent clean machine. The temporary live smoke harness is not part of the committed automated suite; the reproducible committed tests are the API and Playwright commands above.
+Before submission, perform a fresh-clone walkthrough, review and be ready to explain the implementation, and record approximate time spent in the careers form. The PDF supplies no numeric scoring weights; feature completion is not a guaranteed assessment score. Hosting is optional and carries no penalty if omitted (brief, page 31).
+
+## Deployment recommendation (not yet performed)
+
+For this assessment demo, the suggested first option is **Vercel for the Next.js frontend and NestJS API as two separate projects, plus MongoDB Atlas**. This is a recommendation, not a verified deployment recipe. Vercel officially supports both [Next.js](https://vercel.com/docs/frameworks/full-stack/nextjs) and [NestJS](https://vercel.com/docs/frameworks/backend/nestjs); the NestJS app runs as a Vercel Function, subject to function limits.
+
+Use project roots `apps/web` and `apps/api`, with access to workspace dependencies and a build that includes `packages/shared`. Vercel documents [separate projects for monorepo directories](https://vercel.com/docs/monorepos). Its [Hobby plan](https://vercel.com/docs/plans/hobby) is free for personal, non-commercial use within its limits; confirm eligibility before selecting it.
+
+**Heroku is a reasonable alternative for the API** if a continuously running Node process is preferred. Its Cedar Basic dyno is listed at $7/month without sleeping; Eco is $5/month for shared hours and sleeps ([official dyno specifications](https://devcenter.heroku.com/articles/dyno-sizes), checked 11 September 2026). The current API reads `API_PORT`, so a Heroku deployment must map or support Heroku's assigned `PORT` and configure a monorepo build/start process before it is ready. No Procfile or verified Heroku setup is included yet.
+
+Before either deployment:
+
+- Configure Atlas access, a separate demo database, and API-only `MONGODB_URI`/`JWT_SECRET` values in the hosting dashboard.
+- Set `WEB_ORIGIN` to the frontend origin and `NEXT_PUBLIC_API_URL` to the deployed API URL before building the frontend.
+- Validate shared-package builds, database connectivity/transactions, and runtime limits on the actual host. Choose compatible regions for the API and database.
+- Run any existing-data migration with writers stopped. Never run the destructive development seed automatically during deployment.
+- Verify login, role restrictions, assignment/unassignment, and history on the public URLs before adding a live-demo link. Do not expose production credentials or reuse local-only accounts on real data.
+
+## Known limitations and next improvements
+
+- The board fetches at most 100 tasks. Larger-project pagination is future work.
+- Activity uses offset pagination; concurrent inserts can shift page boundaries. Only assignee changes are logged.
+- Membership removal, notifications, real-time subscriptions, archival/retention jobs, and session-storage redesign are not implemented and are discussed as future work.
+- JWTs currently live in localStorage. Production session/security hardening is a separate follow-up.
+- CI on an independent clean environment and public-host verification remain outstanding.
+- Next.js regenerates `next-env.d.ts` for the active output directory during dev/build/browser checks; those generated import-path changes are not hand-authored feature changes.
