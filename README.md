@@ -297,6 +297,10 @@ commands, database setup, and verification. Heroku runs `pnpm heroku-postbuild`
 and starts the root `Procfile`. No credentials, automatic seeds, or automatic
 migrations are included. Local `pnpm dev` still runs the apps separately.
 
+To populate the hosted demo database after deployment, use the explicit one-off
+`seed:demo` workflow in [HEROKU.md](HEROKU.md#database-setup). It reuses the existing
+demo accounts/projects and resets application collections only when requested.
+
 Deployment preparation is implemented; actual Heroku hosting and the provider's
 database connection still require public-host verification.
 

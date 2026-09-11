@@ -10,6 +10,7 @@ Codex was used for this repository review and five-phase implementation. Earlier
 - Review gaps, discuss self-unassignment and transaction consistency, implement the agreed phases, generate regression/browser tests, investigate test failures, and draft documentation/PR descriptions.
 - Run TypeScript, lint, MongoDB-backed API tests, and Playwright browser checks; visually inspect the mobile result. Also run a temporary smoke harness against production Next.js, compiled NestJS, and an isolated real replica set, verifying persisted assignment/unassignment history.
 - The candidate authored the assignment/activity foundation in `aa5e8d1`. The later candidate commit `9432dd2` also contains the ID tie-breaker activity index and debug-log cleanup. The five subsequent PRs extend that candidate work. It must not be represented as functionality inherited from the starter or as newly invented by this implementation pass.
+- Prepared the user-selected single-app Heroku deployment and a manual production demo-seed command. The demo command reuses the existing seed dataset; it requires an explicit reset flag and Config Var, and is not executed during normal builds or restarts. No supplied database credentials were committed or used in local verification.
 
 ## Suggestions rejected or significantly changed
 
