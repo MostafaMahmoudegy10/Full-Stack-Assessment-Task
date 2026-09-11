@@ -42,16 +42,6 @@ export function updateTaskStatus(taskId: string, status: TaskStatus): Promise<Ta
   });
 }
 
-export function updateTask(
-  taskId: string,
-  payload: Partial<Pick<CreateTaskPayload, 'title' | 'description' | 'priority'>>,
-): Promise<TaskDetail> {
-  return apiRequest<TaskDetail>(`/tasks/${taskId}`, {
-    method: 'PATCH',
-    body: payload,
-  });
-}
-
 export function assignTask(taskId: string, assigneeId: string | null): Promise<TaskDetail> {
   return apiRequest<TaskDetail>(`/tasks/${taskId}/assignee`, {
     method: 'PATCH',

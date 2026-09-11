@@ -1,5 +1,4 @@
 export const PROJECT_KEY_PATTERN = /^[A-Z][A-Z0-9]{1,9}$/;
-export const ORGANIZATION_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 72;
