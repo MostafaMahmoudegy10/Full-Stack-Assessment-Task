@@ -132,6 +132,8 @@ set. The smoke test covers demo-seed guards and successful seeding, browser logi
 static assets, same-origin assignment/unassignment and persisted history, and
 cleanup after either server exits. POSIX signal forwarding is skipped on Windows
 and still requires Linux/Heroku verification.
+All 42 API tests and 5 existing browser tests also passed. The browser rerun used
+a fresh ignored output directory to avoid a stale Windows generated-file lock.
 
 References: [Heroku Node support](https://devcenter.heroku.com/articles/nodejs-support),
 [Heroku Node deployment](https://devcenter.heroku.com/articles/deploying-nodejs),
