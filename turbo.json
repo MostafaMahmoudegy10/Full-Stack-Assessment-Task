@@ -3,6 +3,7 @@
   "globalDependencies": [".env"],
   "globalEnv": [
     "NODE_ENV",
+    "SINGLE_APP",
     "MONGODB_URI",
     "JWT_SECRET",
     "JWT_EXPIRES_IN",

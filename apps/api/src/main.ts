@@ -24,7 +24,7 @@ async function bootstrap(): Promise<void> {
   );
 
   const port = configService.get<number>('API_PORT') ?? 4732;
-  await app.listen(port);
+  await app.listen(port, process.env.API_HOST ?? '0.0.0.0');
 
   new Logger('Bootstrap').log(`ProjectFlow API listening on http://localhost:${port}`);
 }

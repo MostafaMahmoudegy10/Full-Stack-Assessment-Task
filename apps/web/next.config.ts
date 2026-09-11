@@ -10,8 +10,17 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
   reactStrictMode: true,
   transpilePackages: ['@projectflow/shared'],
+  ...(process.env.SINGLE_APP === 'true' ? { output: 'standalone' as const } : {}),
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4732',
+    NEXT_PUBLIC_API_URL:
+      process.env.SINGLE_APP === 'true'
+        ? '/api'
+        : (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4732'),
+  },
+  async rewrites() {
+    return process.env.SINGLE_APP === 'true'
+      ? [{ source: '/api/:path*', destination: 'http://127.0.0.1:4732/:path*' }]
+      : [];
   },
 };
 
