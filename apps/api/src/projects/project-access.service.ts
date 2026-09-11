@@ -41,8 +41,6 @@ export class ProjectAccessService {
       this.organizationMembersService.findRole(project.organizationId, userId),
       this.projectMembersService.findRole(project._id, userId),
     ]);
-    console.log('ProjectAccessService.resolve', { projectId, userId, organizationRole, projectRole });
-
     return { project, organizationRole, projectRole };
   }
 
