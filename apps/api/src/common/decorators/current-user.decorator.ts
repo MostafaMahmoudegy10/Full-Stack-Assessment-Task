@@ -8,7 +8,7 @@ export interface AuthenticatedUser {
 
 /** Reads the user that `JwtAuthGuard` attached to the request. */
 export const CurrentUser = createParamDecorator(
-  (data: keyof AuthenticatedUser | undefined, ctx: ExecutionContext) => {
+  (data: keyof AuthenticatedUser | undefined, ctx: ExecutionContext) => { 
     const request = ctx.switchToHttp().getRequest<Request & { user?: AuthenticatedUser }>();
     const user = request.user;
     if (!user) {

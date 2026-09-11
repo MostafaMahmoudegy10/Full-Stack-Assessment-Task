@@ -32,15 +32,15 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request & { user?: AuthenticatedUser }>();
-    const token = extractBearerToken(request.headers.authorization);
-    if (!token) {
+    const token = extractBearerToken(request.headers.authorization);// extract the token from the Authorization header
+    if (!token) { // if no token is provided, throw an UnauthorizedException
       throw new UnauthorizedException('Authentication required');
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-      request.user = { id: payload.sub, email: payload.email };
-      return true;
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token); // verify the token and extract the payload
+      request.user = { id: payload.sub, email: payload.email }; //create a user object and attach it to the request
+      return true; // allow the request to proceed
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
@@ -51,6 +51,6 @@ function extractBearerToken(header: string | undefined): string | null {
   if (!header) {
     return null;
   }
-  const [scheme, value] = header.split(' ');
-  return scheme?.toLowerCase() === 'bearer' && value ? value : null;
+  const [scheme, value] = header.split(' '); // split the header into scheme and value
+  return scheme?.toLowerCase() === 'bearer' && value ? value : null; // return the token if the scheme is 'bearer', otherwise return null
 }

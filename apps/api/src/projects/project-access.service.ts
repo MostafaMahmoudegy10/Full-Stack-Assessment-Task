@@ -41,6 +41,7 @@ export class ProjectAccessService {
       this.organizationMembersService.findRole(project.organizationId, userId),
       this.projectMembersService.findRole(project._id, userId),
     ]);
+    console.log('ProjectAccessService.resolve', { projectId, userId, organizationRole, projectRole });
 
     return { project, organizationRole, projectRole };
   }
@@ -68,6 +69,10 @@ export class ProjectAccessService {
     }
     return context;
   }
+
+  async isMember(projectId: Types.ObjectId, userId: Types.ObjectId): Promise<boolean> {
+    return (await this.projectMembersService.findExisting(projectId, userId)) !== null;
+  }
 }
 
 export function canView(context: ProjectAccessContext): boolean {
@@ -80,3 +85,6 @@ export function canManage(context: ProjectAccessContext): boolean {
     context.projectRole === ProjectRole.PROJECT_MANAGER
   );
 }
+
+  
+

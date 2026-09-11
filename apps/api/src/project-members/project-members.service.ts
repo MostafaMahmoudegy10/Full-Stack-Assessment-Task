@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import type { ProjectRole } from '@projectflow/shared';
+import { ProjectRole } from '@projectflow/shared';
 import { ProjectMember, type ProjectMemberDocument } from './schemas/project-member.schema';
 
 @Injectable()
@@ -38,6 +38,13 @@ export class ProjectMembersService {
     userId: Types.ObjectId,
   ): Promise<ProjectMemberDocument | null> {
     return this.projectMemberModel.findOne({ projectId, userId }).exec();
+  }
+
+   findExistingMembers(
+    projectId: Types.ObjectId,
+    userId: Types.ObjectId,
+  ): Promise<ProjectMemberDocument | null> {
+    return this.projectMemberModel.findOne({ projectId, userId,role:ProjectRole.MEMBER }).exec();
   }
 
   add(
