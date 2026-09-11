@@ -4,9 +4,11 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": ">=20.19"
+    "node": "22.x"
   },
   "scripts": {
+    "start": "node scripts/start-heroku.cjs",
+    "heroku-postbuild": "node scripts/build-heroku.cjs",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
