@@ -289,3 +289,17 @@ mongosh --port 27018 --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localh
 On Windows create `.local/mongo` with `New-Item -ItemType Directory -Force .local/mongo`, then run the same `mongod`/`mongosh` commands. Set `MONGODB_URI=mongodb://localhost:27018/projectflow?replicaSet=rs0` in your root `.env`. Keep MongoDB bound to localhost.
 
 Tests create a disposable one-node replica set and never use the development database. If MongoDB is installed already, set `MONGOMS_SYSTEM_BINARY` to the absolute `mongod` executable path to avoid a download. Set `MONGOMS_SYSTEM_BINARY_VERSION_CHECK=false` if intentionally using a different locally installed version. Run the API test command directly when using these environment overrides: `pnpm --filter @projectflow/api test`.
+
+## Concurrent task numbering and existing databases
+
+Numbers are reserved with atomic `$inc` on a project counter. A unique `(projectId, number)` index is the database backstop. Numbers are project-specific, never reused after deletion, and may have gaps if a later task insertion fails. Separate organizations can use the same project key; task keys are not globally unique.
+
+For an existing database, stop API writers and take a backup before applying this migration. It reports duplicate numbers and stops without modifying data if any exist; resolve those deliberately before continuing. It never silently renumbers tasks. It preserves larger counters, initializes missing counters from the highest existing number, and replaces only the old project/number index. Rerunning it is safe while writes remain paused.
+
+```bash
+pnpm --filter @projectflow/api build
+pnpm --filter @projectflow/api migrate:task-numbering          # inspect only
+pnpm --filter @projectflow/api migrate:task-numbering --apply  # apply with writes stopped
+```
+
+A fresh seed initializes counters automatically. If migration fails, keep writers stopped, resolve the reported problem, and rerun; do not resume the old count-based writer against the new index.

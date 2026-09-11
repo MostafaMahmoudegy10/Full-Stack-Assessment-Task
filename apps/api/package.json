@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest --runInBand --passWithNoTests",
     "test:watch": "jest --watch",
+    "migrate:task-numbering": "node dist/database/migrate-task-numbering.js",
     "seed": "node dist/database/seed.js"
   },
   "dependencies": {

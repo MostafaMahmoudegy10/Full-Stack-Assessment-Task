@@ -74,8 +74,19 @@ export class TasksService {
   ): Promise<TaskDetail> {
     const { project } = await this.projectAccessService.assertCanView(projectId, userId); // ensure the user can view the project
 
-    const taskCount = await this.taskModel.countDocuments({ projectId }); // count existing tasks in the project
-    const number = taskCount + 1; // assign the next task number
+    const reserved = await this.projectModel
+      .findOneAndUpdate(
+        { _id: projectId, taskCounter: { $gte: 0 } },
+        { $inc: { taskCounter: 1 } },
+        { new: true },
+      )
+      .exec();
+    if (!reserved) {
+      throw new BadRequestException(
+        'Project task counter is not initialized; run the task-numbering migration',
+      );
+    }
+    const number = reserved.taskCounter;
 
     const task = await this.taskModel.create({
       // create the new task
