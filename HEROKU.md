@@ -122,9 +122,17 @@ it does not load a root `.env` on your behalf. `pnpm dev` remains unchanged.
 
 ## Deployment status
 
-The repository includes deployment preparation. Public Heroku startup, provider
-database connectivity/transactions, memory use, and public URL checks must still
-be verified on the actual app. No database credentials are included here.
+Live deployment: [ProjectFlow](https://project-flow-d3b5cd641367.herokuapp.com/),
+Heroku app `project-flow`, one Basic web dyno.
+
+On 12 September 2026, the web dyno was running and the one-off demo seed succeeded
+against the configured `projectFlowV2` database: 5 users, 1 organization, 2 projects,
+and 9 tasks. Public login returned HTTP 200; authenticated project/task requests
+returned 2 projects and 9 tasks. This verifies deployed routing, authentication,
+and database connectivity. No database credentials are included here.
+
+Assignment transactions on the hosted database, POSIX shutdown behavior, and
+sustained memory/load behavior still require verification on the actual app.
 
 Local verification on 12 September 2026 passed the production build, TypeScript,
 ESLint, and deployment smoke test using Chrome and a disposable MongoDB replica

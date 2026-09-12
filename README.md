@@ -2,9 +2,11 @@
 
 ProjectFlow is a project and task tracker built with **Next.js, NestJS, and MongoDB** in a TypeScript monorepo. Organizations contain projects, projects contain tasks, and tasks have a creator, an optional assignee, comments, and assignment history.
 
+**[Open the live demo](https://project-flow-d3b5cd641367.herokuapp.com/)** · [Deployment and demo login](#deployment-live-on-one-heroku-app)
+
 ## Current implementation
 
-All five implementation phases have been merged into `main`. The required feature and production fixes are implemented; a public deployment has not been created or verified.
+All five implementation phases have been merged into `main`. The required feature and production fixes are implemented. The app is deployed on Heroku; hosted demo seeding, public login, and authenticated project/task reads have been verified.
 
 | Area                         | Implemented behavior                                                                                                                        |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -265,7 +267,7 @@ Alternatively set `PLAYWRIGHT_CHANNEL=chrome` to use installed Chrome (`$env:PLA
 | Real application smoke check | Production Next.js + compiled NestJS + seeded isolated MongoDB: login, browser assignment/unassignment, and persisted history verified |
 | Visual review                | Desktop and mobile screenshots inspected                                                                                               |
 
-The real application smoke check used a temporary harness; the committed repeatable suites are Jest and Playwright. Verification was performed in this Windows workspace, not on an independent clean machine. A targeted tracked-file scan found no credential-bearing MongoDB URLs, GitHub tokens, or private-key blocks; private `.env` files were absent from repository history. This is not a comprehensive security audit.
+The original real application smoke check used a temporary harness. A repeatable combined deployment smoke test is now committed as `pnpm test:deployment`, alongside Jest and Playwright. Verification was performed in this Windows workspace, not on an independent clean machine. A targeted tracked-file scan found no credential-bearing MongoDB URLs, GitHub tokens, or private-key blocks; private `.env` files were absent from repository history. This is not a comprehensive security audit.
 
 ## Assessment deliverables
 
@@ -285,24 +287,58 @@ The real application smoke check used a temporary harness; the committed repeata
 
 Before submission, perform a fresh-clone walkthrough, review and be ready to explain the implementation, and record approximate time spent in the careers form. The PDF supplies no numeric scoring weights; feature completion is not a guaranteed assessment score. Hosting is optional and carries no penalty if omitted (brief, page 31).
 
-## Deployment: one Heroku app
+## Deployment: live on one Heroku app
 
-The selected deployment runs Next.js and NestJS in one Heroku web dyno, with one
-public domain. Next.js serves the frontend and forwards `/api/*` to the internal
-API. The deployment changes preserve the user's original assignment/activity work
-and the existing application behavior.
+**Live demo: [ProjectFlow](https://project-flow-d3b5cd641367.herokuapp.com/)**
 
-See [HEROKU.md](HEROKU.md) for Config Vars, MongoDB requirements, build/start
-commands, database setup, and verification. Heroku runs `pnpm heroku-postbuild`
-and starts the root `Procfile`. No credentials, automatic seeds, or automatic
-migrations are included. Local `pnpm dev` still runs the apps separately.
+We chose **one Heroku application (`project-flow`) with one Basic web dyno** for
+this assessment demo. It deploys the existing monorepo as one release and exposes
+one public domain, keeping hosting configuration simple while retaining separate
+Next.js and NestJS applications in the codebase. Both processes share the dyno's
+memory and restart/scale together; independent scaling would require separating them.
 
-To populate the hosted demo database after deployment, use the explicit one-off
-`seed:demo` workflow in [HEROKU.md](HEROKU.md#database-setup). It reuses the existing
-demo accounts/projects and resets application collections only when requested.
+| Component   | Hosted behavior                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------- |
+| Frontend    | Next.js standalone server listens on Heroku's assigned `PORT`                                           |
+| Backend     | NestJS listens internally on `127.0.0.1:4732`                                                           |
+| API routing | Next.js forwards `/api/*` to NestJS, removing the `/api` prefix; the browser uses relative `/api` URLs  |
+| Database    | Managed MongoDB provided through Rackspace, configured using the `MONGODB_URI` Config Var               |
+| Build       | `pnpm heroku-postbuild` builds shared packages and both apps, then packages standalone web assets       |
+| Start       | The root `Procfile` starts a supervisor that runs both servers and stops the app if either server exits |
 
-Deployment preparation is implemented; actual Heroku hosting and the provider's
-database connection still require public-host verification.
+The deployment changes preserve the candidate's original assignment/activity work,
+application behavior, and schemas. Local `pnpm dev` still runs the apps separately.
+Secrets are configured in Heroku Config Vars, not committed to the repository.
+See [HEROKU.md](HEROKU.md) for full setup, environment variables, and operations.
+
+### Demo data and login
+
+The existing demo seed was **executed successfully on the hosted database on
+12 September 2026**, creating 5 users, 1 organization, 2 projects, and 9 tasks.
+The application's configured database at verification time was `projectFlowV2`.
+
+Use these public demo credentials:
+
+- Email: `ammar@example.com`
+- Password: `Password123!`
+
+Seeding is a deliberate one-off operation, not a migration or a step repeated on
+every deployment. Normal restarts/redeploys preserve data. The explicit
+[`seed:demo` workflow](HEROKU.md#database-setup) resets application collections
+and restores the demo dataset when requested; use it only for demonstration data.
+
+### Verified on the deployed app
+
+On 12 September 2026, the Heroku web dyno was running, the hosted seed completed,
+and login through the public `/api/auth/login` endpoint returned HTTP 200.
+Authenticated API requests through the same domain returned 2 projects and 9 tasks,
+confirming the deployed API's connection to the seeded database.
+
+The combined production deployment also passed local browser login,
+assignment/unassignment, persisted activity, static asset, and process-failure
+cleanup checks on a disposable replica set. Hosted assignment transactions,
+POSIX shutdown behavior, and sustained memory/load behavior remain to be verified;
+these are separate from the successful public login and data checks above.
 
 ## Known limitations and next improvements
 
@@ -310,5 +346,5 @@ database connection still require public-host verification.
 - Activity uses offset pagination; concurrent inserts can shift page boundaries. Only assignee changes are logged.
 - Membership removal, notifications, real-time subscriptions, archival/retention jobs, and session-storage redesign are not implemented and are discussed as future work.
 - JWTs currently live in localStorage. Production session/security hardening is a separate follow-up.
-- CI on an independent clean environment and public-host verification remain outstanding.
+- CI on an independent clean environment and the remaining hosted checks listed above are outstanding.
 - Next.js regenerates `next-env.d.ts` for the active output directory during dev/build/browser checks; those generated import-path changes are not hand-authored feature changes.
