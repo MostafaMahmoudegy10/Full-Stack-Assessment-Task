@@ -29,3 +29,4 @@ pnpm-debug.log*
 **/playwright-report/
 
 **/.next-browser/
+docs/PROJECTFLOW_STUDY_GUIDE.md

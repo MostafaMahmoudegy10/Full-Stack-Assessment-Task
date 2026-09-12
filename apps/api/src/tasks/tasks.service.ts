@@ -289,19 +289,24 @@ export class TasksService {
     assigneeId: string | null,
     currentUser: AuthenticatedUser,
   ): Promise<TaskDetail> {
-    const id = toObjectId(taskId, 'task id');
-    const currentUserId = toObjectId(currentUser.id, 'user id');
-    const assigneeObjectId = assigneeId === null ? null : toObjectId(assigneeId, 'assignee id');
+    const id = toObjectId(taskId, 'task id'); // Convert taskId to ObjectId
+    const currentUserId = toObjectId(currentUser.id, 'user id'); // convert user id to ObjectId
+    const assigneeObjectId = assigneeId === null ? null : toObjectId(assigneeId, 'assignee id'); // Convert assigneeId to ObjectId
 
-    await this.taskModel.db.transaction(async (session) => {
-      // Re-read on every transaction retry so history describes the committed predecessor.
-      const task = await this.taskModel.findById(id).session(session).exec();
-      if (!task) throw new NotFoundException('Task not found');
-      const access = await this.projectAccessService.assertCanView(task.projectId, currentUserId);
-      const isSelfAssignment = assigneeObjectId?.equals(currentUserId) ?? false;
+    await this.taskModel.db.transaction(async (session) => { // make a transaction to ensure atomicity of the operation to be all in one 
+    
+      const task = await this.taskModel.findById(id).session(session).exec(); // find task by id and use the session to ensure that the operation is part of the transaction
+      if (!task) throw new NotFoundException('Task not found'); 
+
+      const access = await this.projectAccessService.assertCanView(task.projectId, currentUserId); //
+      
+      const isSelfAssignment = assigneeObjectId?.equals(currentUserId) ?? false; // check if he assign task to him self
+
       const isSelfUnassignment =
-        assigneeObjectId === null && (task.assignee?.equals(currentUserId) ?? false);
-      if (
+        assigneeObjectId === null && (task.assignee?.equals(currentUserId) ?? false); // check if he unassign him self task.assign === currentId 
+      
+        if ( // user is not an owner or admin of organization and 
+              // (not a project member or manager or (not self assignement and not selfUnassignment)
         !canManage(access) &&
         (access.projectRole !== ProjectRole.MEMBER || (!isSelfAssignment && !isSelfUnassignment))
       ) {

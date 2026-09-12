@@ -38,8 +38,8 @@ export class ProjectAccessService {
     }
 
     const [organizationRole, projectRole] = await Promise.all([
-      this.organizationMembersService.findRole(project.organizationId, userId),
-      this.projectMembersService.findRole(project._id, userId),
+      this.organizationMembersService.findRole(project.organizationId, userId), // role of current user or the user_id in this organization
+      this.projectMembersService.findRole(project._id, userId), 
     ]);
     return { project, organizationRole, projectRole };
   }
@@ -69,7 +69,7 @@ export class ProjectAccessService {
   }
 
   async isMember(projectId: Types.ObjectId, userId: Types.ObjectId): Promise<boolean> {
-    return (await this.projectMembersService.findExisting(projectId, userId)) !== null;
+    return (await this.projectMembersService.findExisting(projectId, userId))?.role === ProjectRole.MEMBER;
   }
 }
 
